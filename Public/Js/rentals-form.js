@@ -1,6 +1,8 @@
 (function () {
     'use strict';
 
+    // Script que calcula automáticamente montos en el formulario de alquileres.
+
     function parseDate(value) {
         if (!value) {
             return null;
@@ -25,6 +27,7 @@
         });
     }
 
+    // Configura listeners y pinta feedback contextual en el helper del formulario.
     function initRentalCalculator() {
         const startInput = document.getElementById('start_date');
         const endInput = document.getElementById('end_date');

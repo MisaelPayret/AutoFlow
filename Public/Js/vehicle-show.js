@@ -1,6 +1,9 @@
 (function () {
     'use strict';
 
+    // Script liviano para la galería del detalle (carrusel + lightbox).
+
+    // Genera botones de navegación y administra el índice activo.
     function initCarousel() {
         const gallery = document.querySelector('[data-gallery="carousel"]');
         if (!gallery) {
@@ -44,6 +47,7 @@
         updateActive();
     }
 
+    // Controla la superposición para ampliar imágenes con interacción básica.
     function initLightbox() {
         const lightbox = document.querySelector('[data-lightbox]');
         if (!lightbox) {

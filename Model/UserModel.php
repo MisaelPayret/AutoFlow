@@ -4,15 +4,24 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/BaseModel.php';
 
+/**
+ * Maneja registro y autenticación básica de usuarios.
+ */
 class UserModel extends BaseModel
 {
     private const ROLE_OPTIONS = ['admin', 'client'];
 
+    /**
+     * Devuelve los roles permitidos para validar inputs externos.
+     */
     public function getRoleOptions(): array
     {
         return self::ROLE_OPTIONS;
     }
 
+    /**
+     * Sanitiza los datos proveniente del formulario de registro.
+     */
     public function normalizeRegistrationInput(array $input): array
     {
         return [
@@ -23,6 +32,9 @@ class UserModel extends BaseModel
         ];
     }
 
+    /**
+     * Aplica reglas básicas de validación para dar feedback inmediato.
+     */
     public function validateRegistration(array $data): array
     {
         $errors = [];
@@ -46,6 +58,9 @@ class UserModel extends BaseModel
         return $errors;
     }
 
+    /**
+     * Chequea si el correo ya fue registrado.
+     */
     public function emailExists(string $email): bool
     {
         $statement = $this->pdo->prepare('SELECT COUNT(*) FROM `users` WHERE `email` = :email');
@@ -53,6 +68,9 @@ class UserModel extends BaseModel
         return (int) $statement->fetchColumn() > 0;
     }
 
+    /**
+     * Crea un nuevo usuario asignando rol y encriptando la contraseña.
+     */
     public function create(array $data, string $role = 'client'): int
     {
         $roleValue = in_array($role, self::ROLE_OPTIONS, true) ? $role : 'client';
@@ -71,6 +89,9 @@ class UserModel extends BaseModel
         return (int) $this->pdo->lastInsertId();
     }
 
+    /**
+     * Intenta autenticar por email o nombre y retorna el usuario si coincide.
+     */
     public function attemptLogin(string $identifier, string $password): ?array
     {
         $statement = $this->pdo->prepare(

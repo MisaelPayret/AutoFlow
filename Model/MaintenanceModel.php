@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/BaseModel.php';
 
+/**
+ * Acceso a datos para mantenimientos, incluye helpers de formularios.
+ */
 class MaintenanceModel extends BaseModel
 {
+    /**
+     * Devuelve todos los servicios junto al vehículo relacionado.
+     */
     public function listWithVehicles(): array
     {
         $statement = $this->pdo->query(
@@ -18,6 +24,9 @@ class MaintenanceModel extends BaseModel
         return $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /**
+     * Busca un registro puntual por ID.
+     */
     public function find(int $id): ?array
     {
         $stmt = $this->pdo->prepare('SELECT * FROM `maintenance_records` WHERE `id` = :id LIMIT 1');
@@ -27,6 +36,9 @@ class MaintenanceModel extends BaseModel
         return $record ?: null;
     }
 
+    /**
+     * Inserta un nuevo mantenimiento y devuelve el ID generado.
+     */
     public function create(array $data): int
     {
         $statement = $this->pdo->prepare(
@@ -48,6 +60,9 @@ class MaintenanceModel extends BaseModel
         return (int) $this->pdo->lastInsertId();
     }
 
+    /**
+     * Actualiza los campos editables de un mantenimiento.
+     */
     public function update(int $id, array $data): void
     {
         $statement = $this->pdo->prepare(
@@ -74,12 +89,18 @@ class MaintenanceModel extends BaseModel
         ]);
     }
 
+    /**
+     * Elimina definitivamente el registro indicado.
+     */
     public function delete(int $id): void
     {
         $statement = $this->pdo->prepare('DELETE FROM `maintenance_records` WHERE `id` = :id');
         $statement->execute(['id' => $id]);
     }
 
+    /**
+     * Estructura base para hidratar formularios nuevos.
+     */
     public function defaultFormData(): array
     {
         return [
@@ -93,6 +114,9 @@ class MaintenanceModel extends BaseModel
         ];
     }
 
+    /**
+     * Limpia y castea los valores provenientes de $_POST.
+     */
     public function normalizeInput(array $input): array
     {
         $data = [
@@ -116,6 +140,9 @@ class MaintenanceModel extends BaseModel
         return $data;
     }
 
+    /**
+     * Valida cada campo del formulario devolviendo errores traducidos.
+     */
     public function validate(array $data): array
     {
         $errors = [];
@@ -147,6 +174,9 @@ class MaintenanceModel extends BaseModel
         return $errors;
     }
 
+    /**
+     * Cuenta mantenimientos cuyo próximo servicio está vencido.
+     */
     public function countOverdue(): int
     {
         $stmt = $this->pdo->query(
@@ -157,6 +187,9 @@ class MaintenanceModel extends BaseModel
         return (int) $stmt->fetchColumn();
     }
 
+    /**
+     * Suma gastos en un rango móvil de días.
+     */
     public function sumCostLastDays(int $days): float
     {
         $stmt = $this->pdo->prepare(
@@ -168,6 +201,9 @@ class MaintenanceModel extends BaseModel
         return (float) $stmt->fetchColumn();
     }
 
+    /**
+     * Lista mantenimientos futuros ordenados cronológicamente.
+     */
     public function upcoming(int $limit = 4): array
     {
         $statement = $this->pdo->prepare(
@@ -184,6 +220,9 @@ class MaintenanceModel extends BaseModel
         return $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /**
+     * Sugiere una fecha próxima según el tipo de servicio ingresado.
+     */
     public function suggestNextServiceDate(array $data): ?string
     {
         if (!$this->isValidDate($data['service_date'] ?? null)) {
@@ -210,6 +249,9 @@ class MaintenanceModel extends BaseModel
         }
     }
 
+    /**
+     * Comprueba que la cadena siga el formato YYYY-MM-DD.
+     */
     private function isValidDate(?string $value): bool
     {
         if ($value === null || $value === '') {

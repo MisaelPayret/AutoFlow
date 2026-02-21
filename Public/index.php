@@ -1,4 +1,6 @@
 <?php
+
+// Puerta de entrada del proyecto: carga las rutas y delega a los controladores.
 $basePath = dirname(__DIR__);
 $routesFile = $basePath . '/Router/web.php';
 $routes = is_file($routesFile) ? require $routesFile : [];
@@ -8,6 +10,7 @@ if (!is_array($routes)) {
     return;
 }
 
+// Si no llega parámetro usamos auth/login para forzar autenticación.
 $route = trim((string)($_GET['route'] ?? 'auth/login')) ?: 'auth/login';
 
 if (!isset($routes[$route]) || !is_array($routes[$route])) {
@@ -23,6 +26,7 @@ if (!$controllerName || !$action) {
     return;
 }
 
+// Resolvemos el archivo físico del controlador y realizamos validaciones básicas.
 $controllerFile = $basePath . "/Controller/{$controllerName}Controller.php";
 
 if (!is_file($controllerFile)) {

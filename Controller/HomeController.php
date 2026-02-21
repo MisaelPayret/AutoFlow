@@ -6,6 +6,12 @@ require_once dirname(__DIR__) . '/Model/MaintenanceModel.php';
 require_once dirname(__DIR__) . '/Model/RentalModel.php';
 require_once dirname(__DIR__) . '/Model/VehicleModel.php';
 
+/**
+ * Panel principal que agrupa estadísticas rápidas para usuarios autenticados.
+ *
+ * Orquesta la lectura de vehículos, alquileres y mantenimientos para producir
+ * una vista compacta de salud de la flota.
+ */
 class HomeController
 {
     private Database $database;
@@ -26,6 +32,9 @@ class HomeController
         $this->maintenance = new MaintenanceModel($connection);
     }
 
+    /**
+     * Renderiza la página de inicio segura con métricas y listados resumidos.
+     */
     public function index(): void
     {
         if (empty($_SESSION['auth_user_id'])) {
@@ -39,6 +48,12 @@ class HomeController
         ]);
     }
 
+    /**
+     * Calcula todas las métricas mostradas en el hero del dashboard.
+     *
+     * Combina agregados de los diferentes modelos para evitar que la vista
+     * tenga que conocer detalles de la base de datos.
+     */
     private function getDashboardStats(): array
     {
         $statusCounts = $this->vehicles->countByStatus();
@@ -64,6 +79,9 @@ class HomeController
         return $stats;
     }
 
+    /**
+     * Redirige a cualquier ruta definida en el router público.
+     */
     private function redirectToRoute(string $route): void
     {
         $location = 'index.php?route=' . rawurlencode($route);

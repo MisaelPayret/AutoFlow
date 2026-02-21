@@ -4,6 +4,10 @@
     margin: 0;
 }
 
+/*
+ * Hoja de estilos principal: define layout base, dashboard y formularios.
+ * Agrupa varios bloques comentados para que puedas ubicar cada sección rápido.
+ */
 body {
     font-family: Arial, sans-serif;
     margin: 0;

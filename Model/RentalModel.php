@@ -4,15 +4,24 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/BaseModel.php';
 
+/**
+ * Encapsula reglas de negocio de alquileres y cálculos derivados.
+ */
 class RentalModel extends BaseModel
 {
     private const STATUS_OPTIONS = ['draft', 'confirmed', 'in_progress', 'completed', 'cancelled'];
 
+    /**
+     * Expone las opciones permitidas por la BD para mostrar en formularios.
+     */
     public function getStatusOptions(): array
     {
         return self::STATUS_OPTIONS;
     }
 
+    /**
+     * Recupera todos los alquileres con datos esenciales del vehículo.
+     */
     public function listWithVehicles(): array
     {
         $statement = $this->pdo->query(
@@ -25,6 +34,9 @@ class RentalModel extends BaseModel
         return $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /**
+     * Obtiene los alquileres más recientes para el dashboard.
+     */
     public function recent(int $limit = 4): array
     {
         $statement = $this->pdo->prepare(
@@ -40,6 +52,9 @@ class RentalModel extends BaseModel
         return $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /**
+     * Busca por ID devolviendo null si no existe.
+     */
     public function find(int $id): ?array
     {
         $statement = $this->pdo->prepare('SELECT * FROM `rentals` WHERE `id` = :id LIMIT 1');
@@ -49,6 +64,9 @@ class RentalModel extends BaseModel
         return $rental ?: null;
     }
 
+    /**
+     * Inserta un nuevo alquiler y regresa la clave primaria asignada.
+     */
     public function create(array $data): int
     {
         $statement = $this->pdo->prepare(
@@ -76,6 +94,9 @@ class RentalModel extends BaseModel
         return (int) $this->pdo->lastInsertId();
     }
 
+    /**
+     * Actualiza un registro existente con datos validados.
+     */
     public function update(int $id, array $data): void
     {
         $statement = $this->pdo->prepare(
@@ -108,12 +129,18 @@ class RentalModel extends BaseModel
         ]);
     }
 
+    /**
+     * Elimina un alquiler por completo.
+     */
     public function delete(int $id): void
     {
         $statement = $this->pdo->prepare('DELETE FROM `rentals` WHERE `id` = :id');
         $statement->execute(['id' => $id]);
     }
 
+    /**
+     * Valores iniciales para poblar formularios.
+     */
     public function defaultFormData(): array
     {
         return [
@@ -130,6 +157,9 @@ class RentalModel extends BaseModel
         ];
     }
 
+    /**
+     * Limpia y castea el arreglo recibido desde $_POST.
+     */
     public function normalizeInput(array $input): array
     {
         return [
@@ -146,6 +176,9 @@ class RentalModel extends BaseModel
         ];
     }
 
+    /**
+     * Revisa reglas de negocio previo a persistir.
+     */
     public function validate(array $data): array
     {
         $errors = [];
@@ -187,6 +220,9 @@ class RentalModel extends BaseModel
         return $errors;
     }
 
+    /**
+     * Calcula duración y monto total para evitar duplicar lógica en el controlador.
+     */
     public function applyDerivedValues(array $data): array
     {
         $durationDays = $this->calculateDurationDays($data['start_date'], $data['end_date']);
@@ -199,6 +235,9 @@ class RentalModel extends BaseModel
         return $data;
     }
 
+    /**
+     * Cuenta alquileres cuyo estado esté dentro del arreglo provisto.
+     */
     public function countByStatuses(array $statuses): int
     {
         if (empty($statuses)) {
@@ -214,6 +253,9 @@ class RentalModel extends BaseModel
         return (int) $statement->fetchColumn();
     }
 
+    /**
+     * Suma ingresos confirmados en la ventana de días indicada.
+     */
     public function sumRevenueLastDays(int $days): float
     {
         $statement = $this->pdo->prepare(
@@ -226,6 +268,9 @@ class RentalModel extends BaseModel
         return (float) $statement->fetchColumn();
     }
 
+    /**
+     * Promedia la duración de alquileres activos/completados.
+     */
     public function averageDurationDays(): float
     {
         $statement = $this->pdo->query(
@@ -237,12 +282,18 @@ class RentalModel extends BaseModel
         return (float) $statement->fetchColumn();
     }
 
+    /**
+     * Convierte cualquier valor aceptado en string monetario con 2 decimales.
+     */
     private function normalizeMoney($value): string
     {
         $number = is_numeric($value) ? (float) $value : 0.0;
         return number_format($number, 2, '.', '');
     }
 
+    /**
+     * Calcula días corridos inclusive para dos fechas válidas.
+     */
     private function calculateDurationDays(string $start, string $end): int
     {
         if (!$this->isValidDate($start) || !$this->isValidDate($end)) {
@@ -260,6 +311,9 @@ class RentalModel extends BaseModel
         return max(1, $difference + 1);
     }
 
+    /**
+     * Comprueba formato YYYY-MM-DD.
+     */
     private function isValidDate(?string $value): bool
     {
         if ($value === null || $value === '') {

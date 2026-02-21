@@ -5,6 +5,12 @@ require_once dirname(__DIR__) . '/Core/View.php';
 require_once dirname(__DIR__) . '/Model/RentalModel.php';
 require_once dirname(__DIR__) . '/Model/VehicleModel.php';
 
+/**
+ * Administración de reservas y contratos de alquiler.
+ *
+ * Expone operaciones CRUD y utilidades de formulario para conservar el estado
+ * entre redirecciones.
+ */
 class RentalController
 {
     private Database $database;
@@ -23,6 +29,9 @@ class RentalController
         $this->vehicleModel = new VehicleModel($connection);
     }
 
+    /**
+     * Muestra el listado completo con sus estados y vehículos asociados.
+     */
     public function index(): void
     {
         $this->ensureAuthenticated();
@@ -38,6 +47,9 @@ class RentalController
         ]);
     }
 
+    /**
+     * Prepara el formulario de alta reutilizando datos por defecto o previos.
+     */
     public function create(): void
     {
         $this->ensureAuthenticated();
@@ -58,6 +70,9 @@ class RentalController
         ]);
     }
 
+    /**
+     * Persiste un nuevo alquiler tras normalizar y validar los datos.
+     */
     public function store(): void
     {
         $this->ensureAuthenticated();
@@ -79,6 +94,9 @@ class RentalController
         $this->redirectToRoute('rentals');
     }
 
+    /**
+     * Carga un alquiler existente junto a las opciones auxiliares del formulario.
+     */
     public function edit(): void
     {
         $this->ensureAuthenticated();
@@ -107,6 +125,9 @@ class RentalController
         ]);
     }
 
+    /**
+     * Actualiza un alquiler existente recalculando valores derivados.
+     */
     public function update(): void
     {
         $this->ensureAuthenticated();
@@ -136,6 +157,9 @@ class RentalController
         $this->redirectToRoute('rentals');
     }
 
+    /**
+     * Elimina el registro indicado siempre que se envíe por POST.
+     */
     public function delete(): void
     {
         $this->ensureAuthenticated();
@@ -151,12 +175,18 @@ class RentalController
         $_SESSION['rental_flash'] = 'Alquiler eliminado.';
         $this->redirectToRoute('rentals');
     }
+    /**
+     * Guarda en sesión los datos/errores para mostrarlos tras un redirect.
+     */
     private function rememberFormState(array $data, array $errors): void
     {
         $_SESSION['rental_form_data'] = $data;
         $_SESSION['rental_form_errors'] = $errors;
     }
 
+    /**
+     * Recupera y limpia los valores almacenados temporalmente en sesión.
+     */
     private function pullFormState(): array
     {
         $data = $_SESSION['rental_form_data'] ?? [];
@@ -165,6 +195,9 @@ class RentalController
         return [$data, $errors];
     }
 
+    /**
+     * Bloquea el acceso a usuarios sin sesión activa.
+     */
     private function ensureAuthenticated(): void
     {
         if (empty($_SESSION['auth_user_id'])) {
@@ -172,6 +205,9 @@ class RentalController
         }
     }
 
+    /**
+     * Se asegura de que la ruta haya sido invocada mediante POST.
+     */
     private function assertPostRequest(): void
     {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
@@ -179,6 +215,9 @@ class RentalController
         }
     }
 
+    /**
+     * Helper para unificar la lógica de redirecciones internas.
+     */
     private function redirectToRoute(string $route, array $params = []): void
     {
         $query = 'index.php?route=' . rawurlencode($route);

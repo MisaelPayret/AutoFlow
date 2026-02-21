@@ -5,6 +5,12 @@ require_once dirname(__DIR__) . '/Core/View.php';
 require_once dirname(__DIR__) . '/Model/MaintenanceModel.php';
 require_once dirname(__DIR__) . '/Model/VehicleModel.php';
 
+/**
+ * Controlador CRUD para los registros de mantenimiento.
+ *
+ * Se encarga de validar autenticación, preparar formularios y manejar el
+ * estado temporal entre solicitudes.
+ */
 class MaintenanceController
 {
     private Database $database;
@@ -23,6 +29,9 @@ class MaintenanceController
         $this->vehicleModel = new VehicleModel($connection);
     }
 
+    /**
+     * Lista todos los registros junto con la información básica del vehículo.
+     */
     public function index(): void
     {
         $this->ensureAuthenticated();
@@ -37,6 +46,9 @@ class MaintenanceController
         ]);
     }
 
+    /**
+     * Prepara el formulario de alta aplicando datos por defecto o previos.
+     */
     public function create(): void
     {
         $this->ensureAuthenticated();
@@ -56,6 +68,9 @@ class MaintenanceController
         ]);
     }
 
+    /**
+     * Persiste un nuevo mantenimiento después de validar los datos recibidos.
+     */
     public function store(): void
     {
         $this->ensureAuthenticated();
@@ -75,6 +90,9 @@ class MaintenanceController
         $this->redirectToRoute('maintenance');
     }
 
+    /**
+     * Carga un registro existente para edición y reinyecta datos antiguos.
+     */
     public function edit(): void
     {
         $this->ensureAuthenticated();
@@ -102,6 +120,9 @@ class MaintenanceController
         ]);
     }
 
+    /**
+     * Actualiza un mantenimiento existente asegurando integridad de datos.
+     */
     public function update(): void
     {
         $this->ensureAuthenticated();
@@ -127,6 +148,9 @@ class MaintenanceController
         $this->redirectToRoute('maintenance');
     }
 
+    /**
+     * Elimina el mantenimiento indicado mediante una solicitud POST.
+     */
     public function delete(): void
     {
         $this->ensureAuthenticated();
@@ -142,12 +166,18 @@ class MaintenanceController
         $_SESSION['maintenance_flash'] = 'Registro eliminado.';
         $this->redirectToRoute('maintenance');
     }
+    /**
+     * Guarda en sesión los datos de formulario para mostrarlos tras redirect.
+     */
     private function rememberFormState(array $data, array $errors): void
     {
         $_SESSION['maintenance_form_data'] = $data;
         $_SESSION['maintenance_form_errors'] = $errors;
     }
 
+    /**
+     * Recupera y consume los datos/errores almacenados en la sesión.
+     */
     private function pullFormState(): array
     {
         $data = $_SESSION['maintenance_form_data'] ?? [];
@@ -156,6 +186,9 @@ class MaintenanceController
         return [$data, $errors];
     }
 
+    /**
+     * Garantiza que solo usuarios autenticados accedan a estas acciones.
+     */
     private function ensureAuthenticated(): void
     {
         if (empty($_SESSION['auth_user_id'])) {
@@ -163,6 +196,9 @@ class MaintenanceController
         }
     }
 
+    /**
+     * Protección básica para que ciertas rutas solo acepten POST.
+     */
     private function assertPostRequest(): void
     {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
@@ -170,6 +206,9 @@ class MaintenanceController
         }
     }
 
+    /**
+     * Redirige construyendo una query con parámetros opcionales.
+     */
     private function redirectToRoute(string $route, array $params = []): void
     {
         $query = 'index.php?route=' . rawurlencode($route);

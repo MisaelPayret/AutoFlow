@@ -4,6 +4,13 @@ require_once dirname(__DIR__) . '/Database/Database.php';
 require_once dirname(__DIR__) . '/Core/View.php';
 require_once dirname(__DIR__) . '/Model/VehicleModel.php';
 
+/**
+ * Controlador más complejo del sistema: administra catálogo, galería y página
+ * pública de vehículos.
+ *
+ * Además de CRUD clásico, maneja carga de imágenes, reordenamientos y vistas de
+ * detalle/compartir, centralizando todas las reglas en un único lugar.
+ */
 class VehicleController
 {
     private Database $database;
@@ -25,6 +32,9 @@ class VehicleController
         $this->fuelOptions = $this->vehicleModel->getFuelOptions();
     }
 
+    /**
+     * Lista vehículos aplicando filtros y resume estado de cargas recientes.
+     */
     public function index(): void
     {
         $this->ensureAuthenticated();
@@ -56,6 +66,9 @@ class VehicleController
         ]);
     }
 
+    /**
+     * Muestra el formulario de alta con datos por defecto y feedback de uploads.
+     */
     public function create(): void
     {
         $this->ensureAuthenticated();
@@ -80,6 +93,9 @@ class VehicleController
         ]);
     }
 
+    /**
+     * Crea un vehículo nuevo y procesa la primera tanda de imágenes.
+     */
     public function store(): void
     {
         $this->ensureAuthenticated();
@@ -107,6 +123,9 @@ class VehicleController
         $this->redirectToRoute('vehicles/edit', ['id' => $vehicleId]);
     }
 
+    /**
+     * Abre el formulario en modo edición incluyendo galería existente.
+     */
     public function edit(): void
     {
         $this->ensureAuthenticated();
@@ -143,6 +162,9 @@ class VehicleController
         ]);
     }
 
+    /**
+     * Actualiza datos básicos, aplica cambios de galería y maneja reintentos de upload.
+     */
     public function update(): void
     {
         $this->ensureAuthenticated();
@@ -184,6 +206,9 @@ class VehicleController
         $this->redirectToRoute('vehicles');
     }
 
+    /**
+     * Borra un vehículo y limpia los archivos asociados del disco.
+     */
     public function delete(): void
     {
         $this->ensureAuthenticated();
@@ -205,6 +230,9 @@ class VehicleController
         $this->redirectToRoute('vehicles');
     }
 
+    /**
+     * Renderiza una vista detallada pensada para usuarios internos.
+     */
     public function show(): void
     {
         $this->ensureAuthenticated();
@@ -237,6 +265,9 @@ class VehicleController
         ]);
     }
 
+    /**
+     * Construye la landing pública/marketing para un vehículo específico.
+     */
     public function share(): void
     {
         $vehicleId = (int) ($_GET['id'] ?? 0);
@@ -270,6 +301,9 @@ class VehicleController
         ]);
     }
 
+    /**
+     * Mezcla datos mínimos con defaults y renderiza la plantilla pública.
+     */
     private function renderSharePage(array $data): void
     {
         $defaults = [
@@ -288,6 +322,9 @@ class VehicleController
         View::render('Public/VehicleShare.php', array_merge($defaults, $data));
     }
 
+    /**
+     * Genera especificaciones legibles para la tarjeta pública.
+     */
     private function buildPublicSpecs(array $vehicle): array
     {
         $currency = '$' . number_format((float) ($vehicle['daily_rate'] ?? 0), 2);
@@ -304,6 +341,9 @@ class VehicleController
         ];
     }
 
+    /**
+     * Lista beneficios resumidos según los datos más relevantes del vehículo.
+     */
     private function buildPublicPerks(array $vehicle): array
     {
         $perks = [];
@@ -328,6 +368,9 @@ class VehicleController
         return $perks;
     }
 
+    /**
+     * Redacta un texto amigable aprovechando la información cargada.
+     */
     private function buildPublicDescription(array $vehicle): string
     {
         if (!empty($vehicle['notes'])) {
@@ -342,6 +385,9 @@ class VehicleController
         return trim(implode(' ', $segments));
     }
 
+    /**
+     * Interpreta inputs del formulario para borrar, reordenar y elegir portada.
+     */
     private function applyGalleryEdits(int $vehicleId): void
     {
         if ($vehicleId <= 0) {
@@ -429,12 +475,18 @@ class VehicleController
     }
 
 
+    /**
+     * Persiste temporalmente inputs y errores para mostrarlos luego del redirect.
+     */
     private function rememberFormState(array $data, array $errors): void
     {
         $_SESSION['vehicle_form_old'] = $data;
         $_SESSION['vehicle_form_errors'] = $errors;
     }
 
+    /**
+     * Valida y guarda hasta 5 imágenes, devolviendo métricas para la UI.
+     */
     private function processVehicleImagesUpload(int $vehicleId): array
     {
         $result = ['uploaded' => 0, 'skipped' => 0, 'errors' => [], 'notes' => []];
@@ -538,6 +590,9 @@ class VehicleController
         return $result;
     }
 
+    /**
+     * Helper para borrar archivos físicos cuando ya se quitaron de la BD.
+     */
     private function removeImageFromDisk(?string $relativePath): void
     {
         if (empty($relativePath)) {
@@ -550,6 +605,9 @@ class VehicleController
         }
     }
 
+    /**
+     * Normaliza un arreglo arbitrario convirtiéndolo en IDs positivos únicos.
+     */
     private function sanitizeIdArray($values): array
     {
         if (!is_array($values)) {
@@ -562,6 +620,9 @@ class VehicleController
         return array_values(array_unique($ids));
     }
 
+    /**
+     * Convierte un mapa de posiciones enviado por el formulario en enteros.
+     */
     private function sanitizePositionsArray($values): array
     {
         if (!is_array($values)) {
@@ -582,6 +643,9 @@ class VehicleController
         return $positions;
     }
 
+    /**
+     * Permite procesar la versión compacta del estado enviada vía JSON.
+     */
     private function parseGalleryStateFromJson(): array
     {
         $raw = trim((string)($_POST['gallery_state'] ?? ''));
@@ -628,6 +692,9 @@ class VehicleController
         ];
     }
 
+    /**
+     * Distribuye los mensajes de carga en los diferentes contextos (lista/form).
+     */
     private function flashUploadFeedback(array $feedback, array $scopes = []): void
     {
         if (empty($scopes)) {
@@ -659,6 +726,9 @@ class VehicleController
         }
     }
 
+    /**
+     * Obtiene y limpia los errores de upload asociados a un ámbito dado.
+     */
     private function consumeUploadWarnings(string $scope = 'list'): array
     {
         $warnings = $_SESSION['vehicle_upload_errors'][$scope] ?? [];
@@ -671,6 +741,9 @@ class VehicleController
         return $warnings;
     }
 
+    /**
+     * Lee un resumen previo del proceso de carga para mostrarlo en la vista.
+     */
     private function consumeUploadSummary(string $scope = 'list'): array
     {
         $summary = $_SESSION['vehicle_upload_summary'][$scope] ?? [];
@@ -683,6 +756,9 @@ class VehicleController
         return $summary;
     }
 
+    /**
+     * Detecta errores típicos de duplicados para devolver feedback amigable.
+     */
     private function handleVehicleDbException(\PDOException $exception, array $formData, string $route, array $params = []): void
     {
         $errors = [];
@@ -712,6 +788,9 @@ class VehicleController
         $this->redirectToRoute($route, $params);
     }
 
+    /**
+     * Recupera los datos guardados en sesión y los descarta para evitar fugas.
+     */
     private function retrieveFormState(): array
     {
         $data = $_SESSION['vehicle_form_old'] ?? [];
@@ -721,6 +800,9 @@ class VehicleController
         return [$data, $errors];
     }
 
+    /**
+     * Bloquea el acceso a usuarios no autenticados.
+     */
     private function ensureAuthenticated(): void
     {
         if (empty($_SESSION['auth_user_id'])) {
@@ -728,6 +810,9 @@ class VehicleController
         }
     }
 
+    /**
+     * Evita que rutas destructivas se ejecuten por GET.
+     */
     private function assertPostRequest(): void
     {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
@@ -735,6 +820,9 @@ class VehicleController
         }
     }
 
+    /**
+     * Construye una URL interna con query params y fuerza la redirección.
+     */
     private function redirectToRoute(string $route, array $params = []): void
     {
         $query = array_merge(['route' => $route], $params);

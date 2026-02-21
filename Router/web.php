@@ -1,5 +1,6 @@
 <?php
 
+// Mapa sencillo de rutas => controlador/acción.
 return [
     'auth/login' => [
         'controller' => 'Auth',

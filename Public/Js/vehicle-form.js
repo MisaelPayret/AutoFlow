@@ -1,6 +1,9 @@
 (function () {
     'use strict';
 
+    // Utilidades front-end del formulario de vehículos (galería y validador de uploads).
+
+    // Serializa el estado completo de la galería antes de enviar el formulario.
     function initGalleryStateSync() {
         const form = document.querySelector('[data-gallery-form]');
         if (!form) {
@@ -38,6 +41,7 @@
         });
     }
 
+    // Muestra feedback inmediato sobre la selección de imágenes.
     function initUploadHelper() {
         const fileInput = document.querySelector('[data-file-input]');
         const helper = document.querySelector('[data-upload-feedback]');

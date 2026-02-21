@@ -4,27 +4,42 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/BaseModel.php';
 
+/**
+ * Repositorio central de vehículos incluyendo operaciones de galería.
+ */
 class VehicleModel extends BaseModel
 {
     private const STATUS_OPTIONS = ['available', 'reserved', 'rented', 'maintenance', 'retired'];
     private const TRANSMISSION_OPTIONS = ['manual', 'automatic'];
     private const FUEL_OPTIONS = ['nafta', 'diesel', 'hibrido', 'electrico', 'otro'];
 
+    /**
+     * Opciones válidas para el campo `status` según la base de datos.
+     */
     public function getStatusOptions(): array
     {
         return self::STATUS_OPTIONS;
     }
 
+    /**
+     * Transmisiones soportadas por los formularios.
+     */
     public function getTransmissionOptions(): array
     {
         return self::TRANSMISSION_OPTIONS;
     }
 
+    /**
+     * Tipos de combustible admitidos.
+     */
     public function getFuelOptions(): array
     {
         return self::FUEL_OPTIONS;
     }
 
+    /**
+     * Busca vehículos aplicando filtros de texto y estado.
+     */
     public function search(array $filters = []): array
     {
         $sql = 'SELECT v.*, (
@@ -60,6 +75,9 @@ class VehicleModel extends BaseModel
         return $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /**
+     * Agrupa la cantidad de vehículos por estado.
+     */
     public function countByStatus(): array
     {
         $counts = array_fill_keys(self::STATUS_OPTIONS, 0);
@@ -75,12 +93,18 @@ class VehicleModel extends BaseModel
         return $counts;
     }
 
+    /**
+     * Minimiza columnas para selects (id + descripción).
+     */
     public function vehicleOptions(): array
     {
         $statement = $this->pdo->query('SELECT id, brand, model, license_plate FROM `vehicles` ORDER BY brand ASC, model ASC');
         return $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /**
+     * Valores iniciales de un vehículo nuevo.
+     */
     public function defaultData(): array
     {
         return [
@@ -103,6 +127,9 @@ class VehicleModel extends BaseModel
         ];
     }
 
+    /**
+     * Limpia strings y aplica mayúsculas donde corresponde.
+     */
     public function normalizeInput(array $input, array $defaults = []): array
     {
         $base = $defaults ?: $this->defaultData();
@@ -127,6 +154,9 @@ class VehicleModel extends BaseModel
         ];
     }
 
+    /**
+     * Reglas de validación compartidas por create/update.
+     */
     public function validate(array $data): array
     {
         $errors = [];
@@ -187,6 +217,9 @@ class VehicleModel extends BaseModel
         return $errors;
     }
 
+    /**
+     * Inserta un vehículo y retorna su ID.
+     */
     public function create(array $data): int
     {
         $statement = $this->pdo->prepare(
@@ -206,6 +239,9 @@ class VehicleModel extends BaseModel
         return (int) $this->pdo->lastInsertId();
     }
 
+    /**
+     * Actualiza un vehículo existente.
+     */
     public function update(int $id, array $data): void
     {
         $params = $this->mapToDbParams($data);
@@ -235,12 +271,18 @@ class VehicleModel extends BaseModel
         $statement->execute($params);
     }
 
+    /**
+     * Elimina definitivamente el registro.
+     */
     public function delete(int $id): void
     {
         $statement = $this->pdo->prepare('DELETE FROM `vehicles` WHERE `id` = :id');
         $statement->execute(['id' => $id]);
     }
 
+    /**
+     * Busca un vehículo por ID.
+     */
     public function find(int $id): ?array
     {
         $statement = $this->pdo->prepare('SELECT * FROM `vehicles` WHERE `id` = :id LIMIT 1');
@@ -250,6 +292,9 @@ class VehicleModel extends BaseModel
         return $vehicle ?: null;
     }
 
+    /**
+     * Obtiene la galería completa ordenada.
+     */
     public function getImages(int $vehicleId): array
     {
         $statement = $this->pdo->prepare(
@@ -263,6 +308,9 @@ class VehicleModel extends BaseModel
         return $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /**
+     * Devuelve el siguiente índice de posición para nuevas fotos.
+     */
     public function nextImagePosition(int $vehicleId): int
     {
         $statement = $this->pdo->prepare('SELECT COALESCE(MAX(position), 0) FROM vehicle_images WHERE vehicle_id = :vehicle_id');
@@ -271,6 +319,9 @@ class VehicleModel extends BaseModel
         return (int) $statement->fetchColumn();
     }
 
+    /**
+     * Persiste metadatos de una imagen subida.
+     */
     public function insertImage(int $vehicleId, string $fileName, string $storagePath, int $position): void
     {
         $statement = $this->pdo->prepare(
@@ -286,6 +337,9 @@ class VehicleModel extends BaseModel
         ]);
     }
 
+    /**
+     * Borra una imagen y devuelve su ruta relativa para limpiar el disco.
+     */
     public function deleteImage(int $vehicleId, int $imageId): ?string
     {
         $statement = $this->pdo->prepare('SELECT storage_path FROM vehicle_images WHERE vehicle_id = :vehicle_id AND id = :id');
@@ -308,6 +362,9 @@ class VehicleModel extends BaseModel
         return (string) $path;
     }
 
+    /**
+     * Reasigna posiciones según el orden enviado desde la UI.
+     */
     public function reorderImages(int $vehicleId, array $orderedIds): void
     {
         if (empty($orderedIds)) {
@@ -325,6 +382,9 @@ class VehicleModel extends BaseModel
         }
     }
 
+    /**
+     * Genera tarjetas informativas para el detalle/overview.
+     */
     public function buildVehicleInsights(int $vehicleId): array
     {
         $insights = [
@@ -433,6 +493,9 @@ class VehicleModel extends BaseModel
         return array_values($insights);
     }
 
+    /**
+     * Mapea los datos limpios al formato esperado por PDO.
+     */
     private function mapToDbParams(array $data): array
     {
         return [
@@ -455,6 +518,9 @@ class VehicleModel extends BaseModel
         ];
     }
 
+    /**
+     * Diferencia en días entre hoy y una fecha dada (positivo/futuro).
+     */
     private function calculateDayDelta(?string $dateValue): ?int
     {
         if (empty($dateValue)) {
@@ -470,6 +536,9 @@ class VehicleModel extends BaseModel
         }
     }
 
+    /**
+     * Formatea fechas a dd/mm/YYYY para mostrarlas en la UI.
+     */
     private function formatDateHuman(?string $dateValue, string $fallback = 'N/D'): string
     {
         if (empty($dateValue)) {

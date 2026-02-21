@@ -4,6 +4,13 @@ require_once dirname(__DIR__) . '/Database/Database.php';
 require_once dirname(__DIR__) . '/Core/View.php';
 require_once dirname(__DIR__) . '/Model/UserModel.php';
 
+/**
+ * Controlador responsable del ciclo completo de autenticación de usuarios.
+ *
+ * Centraliza lógica de inicio/cierre de sesión, registro y manejo de mensajes
+ * temporales. Mantener todo aquí simplifica la vista pública y ayuda a razonar
+ * sobre los flujos seguros de entrada al sistema.
+ */
 class AuthController
 {
     private Database $database;
@@ -19,6 +26,13 @@ class AuthController
         $this->users = new UserModel($this->database->getConnection());
     }
 
+    /**
+     * Muestra el formulario de inicio de sesión y repuebla mensajes/inputs previos.
+     *
+     * Si el usuario ya está autenticado lo redirige al dashboard para evitar que
+     * vuelva a ingresar credenciales. También consume los mensajes flash que hayan
+     * quedado almacenados en la sesión tras un intento previo.
+     */
     public function showLogin(): void
     {
         if (!empty($_SESSION['auth_user_id'])) {
@@ -41,6 +55,12 @@ class AuthController
         ]);
     }
 
+    /**
+     * Renderiza el registro de nuevos usuarios gestionando datos temporales.
+     *
+     * Solo se permite el acceso a usuarios invitados. Se rescatan los errores y
+     * valores anteriores para mejorar la UX cuando la validación falla.
+     */
     public function showRegister(): void
     {
         if (!empty($_SESSION['auth_user_id'])) {
@@ -61,6 +81,12 @@ class AuthController
         ]);
     }
 
+    /**
+     * Procesa el envío del formulario de login.
+     *
+     * Normaliza entradas, valida presencia mínima, consulta el modelo y define
+     * las variables de sesión que identifican al usuario autenticado.
+     */
     public function login(): void
     {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
@@ -96,6 +122,12 @@ class AuthController
         $this->redirectToRoute('home');
     }
 
+    /**
+     * Registra un nuevo usuario tipo "client" validando duplicados y formato.
+     *
+     * Delegamos en el modelo la normalización/validación para mantener el
+     * controlador enfocado en el flujo y la redirección según el resultado.
+     */
     public function register(): void
     {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
@@ -123,6 +155,12 @@ class AuthController
         $this->redirectToRoute('auth/login');
     }
 
+    /**
+     * Cierra la sesión actual limpiando datos y cookies.
+     *
+     * Se destruye la sesión para eliminar cualquier rastro de autenticación y
+     * luego se inicia nuevamente para setear un mensaje informativo.
+     */
     public function logout(): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
@@ -139,11 +177,19 @@ class AuthController
         $this->redirectToRoute('auth/login');
     }
 
+    /**
+     * Azúcar sintáctica para redireccionar al formulario de login.
+     */
     private function redirectToLogin(): void
     {
         $this->redirectToRoute('auth/login');
     }
 
+    /**
+     * Construye la URL interna y envía el header Location correspondiente.
+     *
+     * @param string $route Ruta registrada en Router/web.php
+     */
     private function redirectToRoute(string $route): void
     {
         $location = 'index.php?route=' . rawurlencode($route);

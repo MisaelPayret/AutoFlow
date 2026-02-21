@@ -9,6 +9,9 @@ final class View
 {
     private function __construct() {}
 
+    /**
+     * Carga la vista indicada y la alimenta con el arreglo $data.
+     */
     public static function render(string $view, array $data = []): void
     {
         $normalized = ltrim($view, '/');

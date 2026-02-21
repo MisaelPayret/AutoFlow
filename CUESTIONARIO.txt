@@ -1,0 +1,70 @@
+AutoFlow - Cuestionario para el cliente
+Fecha: 21/02/2026
+
+Objetivo
+Responder estas preguntas nos ayuda a definir la base de datos y el alcance real del sistema.
+Si algo no aplica, escribir "N/A".
+
+1) Objetivo del negocio
+- Cual es el problema principal que queres resolver con AutoFlow?
+- Cuales procesos son prioritarios hoy y cuales podrian venir despues?
+- Que indicadores o reportes queres ver en el panel?
+
+2) Flota y vehiculos
+- Que tipos de vehiculos manejan (categorias, marcas, modelos)?
+- Que campos son obligatorios por vehiculo (patente, VIN, padron, etc.)?
+- Necesitan historial de cambios (estado, tarifa, kilometraje, ubicacion)?
+- Manejan accesorios o equipamiento asociado a un vehiculo?
+
+3) Usuarios y accesos
+- Hoy solo hay un usuario/gestor. Queremos mantener un unico usuario o queres poder crear otros en el futuro?
+- Si se agregan usuarios, que tipos de accesos te interesan?
+- Te interesa un registro simple de acciones (actividad reciente), o no es necesario?
+
+4) Alquileres / contratos
+- Que estados usa un alquiler (borrador, activo, finalizado, cancelado)?
+- Se permite solapamiento de alquileres por vehiculo?
+- Como se calcula el precio (tarifa base, extras, descuentos, impuestos)?
+- Hay depositos o garantias?
+
+5) Mantenimiento
+- Que tipos de mantenimiento registran?
+- Con que frecuencia o reglas se generan alertas?
+- Necesitan registrar talleres, proveedores o responsables?
+
+6) Pagos y facturacion
+- Se registran pagos? Parciales o completos?
+- Se necesita emitir factura o recibo?
+- Moneda unica o multi-moneda?
+
+7) Documentacion y archivos
+- Que documentos se adjuntan (por vehiculo o por alquiler)?
+- Limites de tamanio y tipos de archivos?
+- Necesitan versionado o historial de documentos?
+
+8) Disponibilidad y reservas
+- Como se define un vehiculo disponible?
+- Se manejan reservas previas?
+- Se necesita bloqueo manual de vehiculos?
+
+9) Integraciones
+- Se integrara con GPS, ERP, CRM u otros sistemas?
+- Se necesita importar o exportar datos?
+
+10) Reportes
+- Que reportes son criticos (rentabilidad, uso, costos)?
+- Frecuencia y formato deseado?
+
+11) Seguridad y cumplimiento
+- Que datos sensibles se almacenan?
+- Politicas de retencion o eliminacion de datos?
+- Requisitos legales o normativas?
+
+12) Escalabilidad
+- Cantidad estimada de vehiculos y alquileres por mes/anio?
+- Aunque seas el unico gestor, te gustaria poder manejar mas de una sucursal o unidad en el futuro?
+
+13) Terminologia
+- Como llaman internamente a cada entidad (vehiculo, unidad, contrato)?
+- Hay nombres que prefieran evitar o cambiar?
+

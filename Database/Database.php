@@ -13,6 +13,9 @@ class Database
     private string $password = '';
     private ?PDO $connection = null;
 
+    /**
+     * Permite sobreescribir parámetros de conexión (host, usuario, etc.).
+     */
     public function __construct(array $config = [])
     {
         $this->host = $config['host'] ?? $this->host;
@@ -23,6 +26,9 @@ class Database
         $this->initialize();
     }
 
+    /**
+     * Devuelve una instancia viva de PDO, reusándola cuando ya existe.
+     */
     public function getConnection(): PDO
     {
         if ($this->connection === null) {
@@ -32,6 +38,9 @@ class Database
         return $this->connection;
     }
 
+    /**
+     * Crea la base si no existe, abre la conexión y ejecuta migraciones.
+     */
     private function initialize(): void
     {
         try {
@@ -52,6 +61,9 @@ class Database
         }
     }
 
+    /**
+     * Configuración base usada en cada nueva conexión PDO.
+     */
     private function defaultOptions(): array
     {
         return [
@@ -61,6 +73,9 @@ class Database
         ];
     }
 
+    /**
+     * Ejecuta el SQL mínimo para que la app funcione en entornos limpios.
+     */
     private function runMigrations(): void
     {
         foreach ($this->schemaStatements() as $statement) {
@@ -71,6 +86,9 @@ class Database
         $this->seedDefaultAdmin();
     }
 
+    /**
+     * Colección de sentencias CREATE TABLE ordenadas según dependencias.
+     */
     private function schemaStatements(): array
     {
         return [
@@ -187,6 +205,9 @@ class Database
         ];
     }
 
+    /**
+     * Agrega columnas nuevas cuando el proyecto evoluciona.
+     */
     private function applySchemaUpgrades(): void
     {
         if ($this->connection === null) {
@@ -197,6 +218,9 @@ class Database
         $this->ensureVehicleColumn('passenger_capacity', 'TINYINT UNSIGNED NOT NULL DEFAULT 1', 'capacity_kg');
     }
 
+    /**
+     * Añade una columna a vehicles si aún no existe (opera idempotentemente).
+     */
     private function ensureVehicleColumn(string $column, string $definition, string $afterColumn): void
     {
         if ($this->columnExists('vehicles', $column)) {
@@ -208,6 +232,9 @@ class Database
         );
     }
 
+    /**
+     * Helper genérico para consultar INFORMATION_SCHEMA.
+     */
     private function columnExists(string $table, string $column): bool
     {
         if ($this->connection === null) {
@@ -226,6 +253,9 @@ class Database
         return (int) $statement->fetchColumn() > 0;
     }
 
+    /**
+     * Inserta un usuario administrador por defecto si la tabla está vacía.
+     */
     private function seedDefaultAdmin(): void
     {
         if ($this->connection === null) {
