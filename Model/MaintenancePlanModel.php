@@ -10,6 +10,67 @@ require_once __DIR__ . '/BaseModel.php';
 class MaintenancePlanModel extends BaseModel
 {
     /**
+     * Lista planes con datos de vehiculo.
+     */
+    public function listWithVehicles(array $filters = [], int $limit = 50, int $offset = 0): array
+    {
+        $sql =
+            'SELECT p.*, v.brand, v.model, v.license_plate
+             FROM `maintenance_plans` AS p
+             INNER JOIN `vehicles` AS v ON v.id = p.vehicle_id
+             WHERE 1=1';
+        $params = [];
+
+        if (!empty($filters['vehicle_id'])) {
+            $sql .= ' AND p.`vehicle_id` = :vehicle_id';
+            $params['vehicle_id'] = (int) $filters['vehicle_id'];
+        }
+
+        if (isset($filters['is_active']) && $filters['is_active'] !== '') {
+            $sql .= ' AND p.`is_active` = :is_active';
+            $params['is_active'] = (int) $filters['is_active'];
+        }
+
+        $sql .= ' ORDER BY p.`created_at` DESC LIMIT :limit OFFSET :offset';
+
+        $statement = $this->pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $statement->bindValue(':' . $key, $value);
+        }
+        $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $statement->execute();
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * Cuenta planes segun filtros.
+     */
+    public function count(array $filters = []): int
+    {
+        $sql = 'SELECT COUNT(*) FROM `maintenance_plans` WHERE 1=1';
+        $params = [];
+
+        if (!empty($filters['vehicle_id'])) {
+            $sql .= ' AND `vehicle_id` = :vehicle_id';
+            $params['vehicle_id'] = (int) $filters['vehicle_id'];
+        }
+
+        if (isset($filters['is_active']) && $filters['is_active'] !== '') {
+            $sql .= ' AND `is_active` = :is_active';
+            $params['is_active'] = (int) $filters['is_active'];
+        }
+
+        $statement = $this->pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $statement->bindValue(':' . $key, $value);
+        }
+        $statement->execute();
+
+        return (int) $statement->fetchColumn();
+    }
+    /**
      * Lista planes de mantenimiento por vehiculo.
      */
     public function listByVehicle(int $vehicleId): array
@@ -41,6 +102,7 @@ class MaintenancePlanModel extends BaseModel
      */
     public function create(array $data): int
     {
+        $data = $this->applyDerivedValues($data);
         $statement = $this->pdo->prepare(
             'INSERT INTO `maintenance_plans`
             (vehicle_id, service_type, interval_km, interval_months, last_service_date, last_service_km,
@@ -71,6 +133,7 @@ class MaintenancePlanModel extends BaseModel
      */
     public function update(int $id, array $data): void
     {
+        $data = $this->applyDerivedValues($data);
         $statement = $this->pdo->prepare(
             'UPDATE `maintenance_plans` SET
                 vehicle_id = :vehicle_id,
@@ -108,6 +171,89 @@ class MaintenancePlanModel extends BaseModel
     {
         $statement = $this->pdo->prepare('DELETE FROM `maintenance_plans` WHERE `id` = :id');
         $statement->execute(['id' => $id]);
+    }
+
+    /**
+     * Aplica calculos automaticos de proximo servicio si falta.
+     */
+    public function applyDerivedValues(array $data): array
+    {
+        if ($data['next_service_date'] === null && $data['interval_months'] !== null && $data['last_service_date'] !== null) {
+            $data['next_service_date'] = $this->addMonths($data['last_service_date'], $data['interval_months']);
+        }
+
+        if ($data['next_service_km'] === null && $data['interval_km'] !== null && $data['last_service_km'] !== null) {
+            $data['next_service_km'] = $data['last_service_km'] + $data['interval_km'];
+        }
+
+        return $data;
+    }
+
+    /**
+     * Actualiza un plan activo con el ultimo mantenimiento.
+     */
+    public function updateFromMaintenance(int $vehicleId, string $serviceType, ?string $serviceDate, ?int $serviceKm): void
+    {
+        if ($vehicleId <= 0 || $serviceType === '') {
+            return;
+        }
+
+        $statement = $this->pdo->prepare(
+            'SELECT * FROM `maintenance_plans`
+             WHERE `vehicle_id` = :vehicle_id
+               AND `service_type` = :service_type
+               AND `is_active` = 1
+             ORDER BY `created_at` DESC
+             LIMIT 1'
+        );
+        $statement->execute([
+            'vehicle_id' => $vehicleId,
+            'service_type' => $serviceType,
+        ]);
+        $plan = $statement->fetch(PDO::FETCH_ASSOC);
+
+        if (!$plan) {
+            return;
+        }
+
+        $plan['last_service_date'] = $serviceDate ?: $plan['last_service_date'];
+        $plan['last_service_km'] = $serviceKm ?? $plan['last_service_km'];
+        $plan = $this->applyDerivedValues($plan);
+
+        $this->update((int) $plan['id'], $plan);
+        $this->syncVehicleNextService((int) $plan['vehicle_id']);
+    }
+
+    /**
+     * Sincroniza el proximo servicio del vehiculo con el plan mas cercano.
+     */
+    public function syncVehicleNextService(int $vehicleId): void
+    {
+        if ($vehicleId <= 0) {
+            return;
+        }
+
+        $statement = $this->pdo->prepare(
+            'SELECT
+                MIN(`next_service_date`) AS next_date,
+                MIN(`next_service_km`) AS next_km
+             FROM `maintenance_plans`
+             WHERE `vehicle_id` = :vehicle_id AND `is_active` = 1'
+        );
+        $statement->execute(['vehicle_id' => $vehicleId]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $update = $this->pdo->prepare(
+            'UPDATE `vehicles`
+             SET `next_service_date` = :next_service_date,
+                 `next_service_km` = :next_service_km
+             WHERE `id` = :id'
+        );
+        $update->execute([
+            'next_service_date' => $row['next_date'] ?? null,
+            'next_service_km' => $row['next_km'] ?? null,
+            'id' => $vehicleId,
+        ]);
     }
 
     /**
@@ -170,7 +316,26 @@ class MaintenancePlanModel extends BaseModel
             $errors['interval_km'] = 'Defini un intervalo o una proxima fecha/km.';
         }
 
+        if ($data['interval_km'] !== null && $data['interval_km'] <= 0) {
+            $errors['interval_km'] = 'El intervalo en km debe ser mayor a 0.';
+        }
+
+        if ($data['interval_months'] !== null && $data['interval_months'] <= 0) {
+            $errors['interval_months'] = 'El intervalo en meses debe ser mayor a 0.';
+        }
+
         return $errors;
+    }
+
+    private function addMonths(string $dateValue, int $months): ?string
+    {
+        try {
+            $date = new DateTime($dateValue);
+            $date->add(new DateInterval('P' . max(1, $months) . 'M'));
+            return $date->format('Y-m-d');
+        } catch (Exception $exception) {
+            return null;
+        }
     }
 
     private function normalizeNullableInt($value): ?int

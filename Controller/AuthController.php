@@ -1,6 +1,7 @@
 <?php
 
 require_once dirname(__DIR__) . '/Database/Database.php';
+require_once dirname(__DIR__) . '/Core/Csrf.php';
 require_once dirname(__DIR__) . '/Core/View.php';
 require_once dirname(__DIR__) . '/Model/UserModel.php';
 
@@ -38,7 +39,8 @@ class AuthController
     public function showLogin(): void
     {
         if (!empty($_SESSION['auth_user_id'])) {
-            $this->redirectToRoute('home');
+            $role = $_SESSION['auth_user_role'] ?? null;
+            $this->redirectToRoute($role === 'admin' ? 'home' : 'auth/denied');
             return;
         }
 
@@ -66,7 +68,8 @@ class AuthController
     public function showRegister(): void
     {
         if (!empty($_SESSION['auth_user_id'])) {
-            $this->redirectToRoute('home');
+            $role = $_SESSION['auth_user_role'] ?? null;
+            $this->redirectToRoute($role === 'admin' ? 'home' : 'auth/denied');
             return;
         }
 
@@ -92,6 +95,12 @@ class AuthController
     public function login(): void
     {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            $this->redirectToLogin();
+            return;
+        }
+
+        if (!Csrf::validate($_POST['_csrf'] ?? null)) {
+            $_SESSION['auth_error'] = 'La sesión expiró. Volvé a intentarlo.';
             $this->redirectToLogin();
             return;
         }
@@ -149,6 +158,12 @@ class AuthController
             return;
         }
 
+        if (!Csrf::validate($_POST['_csrf'] ?? null)) {
+            $_SESSION['auth_register_message'] = 'La sesión expiró. Volvé a intentarlo.';
+            $this->redirectToRoute('auth/register');
+            return;
+        }
+
         $formData = $this->users->normalizeRegistrationInput($_POST);
         $errors = $this->users->validateRegistration($formData);
 
@@ -187,8 +202,24 @@ class AuthController
         }
 
         session_start();
+        session_regenerate_id(true);
         $_SESSION['auth_message'] = 'Sesión cerrada correctamente.';
         $this->redirectToRoute('auth/login');
+    }
+
+    /**
+     * Muestra una pantalla de acceso denegado para usuarios autenticados.
+     */
+    public function accessDenied(): void
+    {
+        $message = $_SESSION['auth_error'] ?? 'No tenes permisos para acceder a esta seccion.';
+        unset($_SESSION['auth_error']);
+
+        View::render('Public/AccessDenied.php', [
+            'message' => $message,
+            'pageTitle' => 'Acceso denegado | AutoFlow',
+            'bodyClass' => 'public-page denied-page',
+        ]);
     }
 
     /**

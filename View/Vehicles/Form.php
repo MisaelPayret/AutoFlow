@@ -36,7 +36,7 @@ include_once __DIR__ . '/../Include/Header.php';
 
     <?php if (!empty($formErrors)) : ?>
         <div class="alert alert-error">
-            <strong>Revisa los campos:</strong>
+            <strong>Revisa los Campos:</strong>
             <ul>
                 <?php foreach ($formErrors as $error) : ?>
                     <li><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></li>
@@ -46,13 +46,20 @@ include_once __DIR__ . '/../Include/Header.php';
     <?php endif; ?>
 
     <form method="POST" action="index.php?route=<?= $actionRoute; ?>" class="form-grid" enctype="multipart/form-data" data-gallery-form="true">
+        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token(), ENT_QUOTES, 'UTF-8'); ?>">
         <?php if ($isEdit) : ?>
             <input type="hidden" name="id" value="<?= (int)($formData['id'] ?? 0); ?>">
         <?php endif; ?>
 
+        <div class="form-section form-field--full">
+            <h2>Datos básicos</h2>
+            <p>Completá la identidad del vehículo y los datos principales.</p>
+        </div>
+
         <div class="form-field <?= $hasFieldError('internal_code') ? 'has-error' : ''; ?>">
-            <label for="internal_code">Padrón *</label>
-            <input type="text" id="internal_code" name="internal_code" required value="<?= htmlspecialchars($formData['internal_code'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+            <label for="internal_code">Padron *</label>
+            <input type="text" id="internal_code" name="internal_code" value="<?= htmlspecialchars($formData['internal_code'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+            <small class="form-hint">Si lo dejás vacío se genera automáticamente.</small>
             <?php if ($hasFieldError('internal_code')) : ?>
                 <small class="form-error"><?= htmlspecialchars($getFieldError('internal_code'), ENT_QUOTES, 'UTF-8'); ?></small>
             <?php endif; ?>
@@ -61,6 +68,7 @@ include_once __DIR__ . '/../Include/Header.php';
         <div class="form-field <?= $hasFieldError('license_plate') ? 'has-error' : ''; ?>">
             <label for="license_plate">Patente *</label>
             <input type="text" id="license_plate" name="license_plate" required value="<?= htmlspecialchars($formData['license_plate'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+            <small class="form-hint">Ingresá la patente tal como figura en el vehículo.</small>
             <?php if ($hasFieldError('license_plate')) : ?>
                 <small class="form-error"><?= htmlspecialchars($getFieldError('license_plate'), ENT_QUOTES, 'UTF-8'); ?></small>
             <?php endif; ?>
@@ -85,6 +93,7 @@ include_once __DIR__ . '/../Include/Header.php';
         <div class="form-field <?= $hasFieldError('year') ? 'has-error' : ''; ?>">
             <label for="year">Año *</label>
             <input type="number" id="year" name="year" min="1980" max="<?= (int) date('Y') + 1; ?>" required value="<?= htmlspecialchars($formData['year'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+            <small class="form-hint">Año del modelo o fabricación.</small>
             <?php if ($hasFieldError('year')) : ?>
                 <small class="form-error"><?= htmlspecialchars($getFieldError('year'), ENT_QUOTES, 'UTF-8'); ?></small>
             <?php endif; ?>
@@ -98,60 +107,9 @@ include_once __DIR__ . '/../Include/Header.php';
             <?php endif; ?>
         </div>
 
-        <div class="form-field <?= $hasFieldError('transmission') ? 'has-error' : ''; ?>">
-            <label for="transmission">Transmisión</label>
-            <select id="transmission" name="transmission">
-                <?php foreach ($transmissionOptions as $option) : ?>
-                    <option value="<?= $option; ?>" <?= ($formData['transmission'] ?? '') === $option ? 'selected' : ''; ?>><?= ucfirst($option); ?></option>
-                <?php endforeach; ?>
-            </select>
-            <?php if ($hasFieldError('transmission')) : ?>
-                <small class="form-error"><?= htmlspecialchars($getFieldError('transmission'), ENT_QUOTES, 'UTF-8'); ?></small>
-            <?php endif; ?>
-        </div>
-
-        <div class="form-field <?= $hasFieldError('fuel_type') ? 'has-error' : ''; ?>">
-            <label for="fuel_type">Combustible</label>
-            <select id="fuel_type" name="fuel_type">
-                <?php foreach ($fuelOptions as $option) : ?>
-                    <option value="<?= $option; ?>" <?= ($formData['fuel_type'] ?? '') === $option ? 'selected' : ''; ?>><?= ucfirst($option); ?></option>
-                <?php endforeach; ?>
-            </select>
-            <?php if ($hasFieldError('fuel_type')) : ?>
-                <small class="form-error"><?= htmlspecialchars($getFieldError('fuel_type'), ENT_QUOTES, 'UTF-8'); ?></small>
-            <?php endif; ?>
-        </div>
-
-        <div class="form-field <?= $hasFieldError('mileage_km') ? 'has-error' : ''; ?>">
-            <label for="mileage_km">Kilometraje</label>
-            <input type="number" id="mileage_km" name="mileage_km" min="0" value="<?= htmlspecialchars($formData['mileage_km'] ?? '0', ENT_QUOTES, 'UTF-8'); ?>">
-            <?php if ($hasFieldError('mileage_km')) : ?>
-                <small class="form-error"><?= htmlspecialchars($getFieldError('mileage_km'), ENT_QUOTES, 'UTF-8'); ?></small>
-            <?php endif; ?>
-        </div>
-
-        <div class="form-field <?= $hasFieldError('capacity_kg') ? 'has-error' : ''; ?>">
-            <label for="capacity_kg">Capacidad aprox. de carga (kg)</label>
-            <input type="number" id="capacity_kg" name="capacity_kg" min="0" value="<?= htmlspecialchars($formData['capacity_kg'] ?? '0', ENT_QUOTES, 'UTF-8'); ?>">
-            <?php if ($hasFieldError('capacity_kg')) : ?>
-                <small class="form-error"><?= htmlspecialchars($getFieldError('capacity_kg'), ENT_QUOTES, 'UTF-8'); ?></small>
-            <?php endif; ?>
-        </div>
-
-        <div class="form-field <?= $hasFieldError('passenger_capacity') ? 'has-error' : ''; ?>">
-            <label for="passenger_capacity">Cantidad de pasajeros</label>
-            <input type="number" id="passenger_capacity" name="passenger_capacity" min="1" value="<?= htmlspecialchars($formData['passenger_capacity'] ?? '1', ENT_QUOTES, 'UTF-8'); ?>">
-            <?php if ($hasFieldError('passenger_capacity')) : ?>
-                <small class="form-error"><?= htmlspecialchars($getFieldError('passenger_capacity'), ENT_QUOTES, 'UTF-8'); ?></small>
-            <?php endif; ?>
-        </div>
-
-        <div class="form-field <?= $hasFieldError('daily_rate') ? 'has-error' : ''; ?>">
-            <label for="daily_rate">Tarifa diaria (USD)</label>
-            <input type="number" step="0.01" min="0" id="daily_rate" name="daily_rate" value="<?= htmlspecialchars($formData['daily_rate'] ?? '0', ENT_QUOTES, 'UTF-8'); ?>">
-            <?php if ($hasFieldError('daily_rate')) : ?>
-                <small class="form-error"><?= htmlspecialchars($getFieldError('daily_rate'), ENT_QUOTES, 'UTF-8'); ?></small>
-            <?php endif; ?>
+        <div class="form-section form-field--full">
+            <h2>Operación</h2>
+            <p>Definí el estado operativo, capacidades y tarifa.</p>
         </div>
 
         <div class="form-field <?= $hasFieldError('status') ? 'has-error' : ''; ?>">
@@ -166,29 +124,99 @@ include_once __DIR__ . '/../Include/Header.php';
             <?php endif; ?>
         </div>
 
-        <div class="form-field <?= $hasFieldError('vin') ? 'has-error' : ''; ?>">
-            <label for="vin">VIN</label>
-            <input type="text" id="vin" name="vin" value="<?= htmlspecialchars($formData['vin'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
-            <?php if ($hasFieldError('vin')) : ?>
-                <small class="form-error"><?= htmlspecialchars($getFieldError('vin'), ENT_QUOTES, 'UTF-8'); ?></small>
+        <div class="form-field <?= $hasFieldError('daily_rate') ? 'has-error' : ''; ?>">
+            <label for="daily_rate">Tarifa diaria (USD)</label>
+            <input type="number" step="0.01" min="0" id="daily_rate" name="daily_rate" value="<?= htmlspecialchars($formData['daily_rate'] ?? '0', ENT_QUOTES, 'UTF-8'); ?>">
+            <small class="form-hint">Tarifa por día sin impuestos.</small>
+            <?php if ($hasFieldError('daily_rate')) : ?>
+                <small class="form-error"><?= htmlspecialchars($getFieldError('daily_rate'), ENT_QUOTES, 'UTF-8'); ?></small>
             <?php endif; ?>
         </div>
 
-        <div class="form-field <?= $hasFieldError('purchased_at') ? 'has-error' : ''; ?>">
-            <label for="purchased_at">Fecha de compra</label>
-            <input type="date" id="purchased_at" name="purchased_at" value="<?= htmlspecialchars($formData['purchased_at'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
-            <?php if ($hasFieldError('purchased_at')) : ?>
-                <small class="form-error"><?= htmlspecialchars($getFieldError('purchased_at'), ENT_QUOTES, 'UTF-8'); ?></small>
+        <div class="form-field <?= $hasFieldError('mileage_km') ? 'has-error' : ''; ?>">
+            <label for="mileage_km">Kilometraje</label>
+            <input type="number" id="mileage_km" name="mileage_km" min="0" value="<?= htmlspecialchars($formData['mileage_km'] ?? '0', ENT_QUOTES, 'UTF-8'); ?>">
+            <small class="form-hint">Kilometraje actual del vehículo.</small>
+            <?php if ($hasFieldError('mileage_km')) : ?>
+                <small class="form-error"><?= htmlspecialchars($getFieldError('mileage_km'), ENT_QUOTES, 'UTF-8'); ?></small>
             <?php endif; ?>
         </div>
 
-        <div class="form-field form-field--full <?= $hasFieldError('notes') ? 'has-error' : ''; ?>">
-            <label for="notes">Notas</label>
-            <textarea id="notes" name="notes" rows="3"><?= htmlspecialchars($formData['notes'] ?? '', ENT_QUOTES, 'UTF-8'); ?></textarea>
-            <?php if ($hasFieldError('notes')) : ?>
-                <small class="form-error"><?= htmlspecialchars($getFieldError('notes'), ENT_QUOTES, 'UTF-8'); ?></small>
+        <div class="form-field <?= $hasFieldError('capacity_kg') ? 'has-error' : ''; ?>">
+            <label for="capacity_kg">Capacidad aprox. de carga (kg)</label>
+            <input type="number" id="capacity_kg" name="capacity_kg" min="0" value="<?= htmlspecialchars($formData['capacity_kg'] ?? '0', ENT_QUOTES, 'UTF-8'); ?>">
+            <small class="form-hint">Usá 0 si no aplica.</small>
+            <?php if ($hasFieldError('capacity_kg')) : ?>
+                <small class="form-error"><?= htmlspecialchars($getFieldError('capacity_kg'), ENT_QUOTES, 'UTF-8'); ?></small>
             <?php endif; ?>
         </div>
+
+        <div class="form-field <?= $hasFieldError('passenger_capacity') ? 'has-error' : ''; ?>">
+            <label for="passenger_capacity">Cantidad de pasajeros</label>
+            <input type="number" id="passenger_capacity" name="passenger_capacity" min="1" value="<?= htmlspecialchars($formData['passenger_capacity'] ?? '1', ENT_QUOTES, 'UTF-8'); ?>">
+            <small class="form-hint">Incluye conductor.</small>
+            <?php if ($hasFieldError('passenger_capacity')) : ?>
+                <small class="form-error"><?= htmlspecialchars($getFieldError('passenger_capacity'), ENT_QUOTES, 'UTF-8'); ?></small>
+            <?php endif; ?>
+        </div>
+
+        <div class="form-field <?= $hasFieldError('transmission') ? 'has-error' : ''; ?>">
+            <label for="transmission">Transmisión</label>
+            <select id="transmission" name="transmission">
+                <?php foreach ($transmissionOptions as $option) : ?>
+                    <option value="<?= $option; ?>" <?= ($formData['transmission'] ?? '') === $option ? 'selected' : ''; ?>><?= ucfirst($option); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <small class="form-hint">Manual o automática.</small>
+            <?php if ($hasFieldError('transmission')) : ?>
+                <small class="form-error"><?= htmlspecialchars($getFieldError('transmission'), ENT_QUOTES, 'UTF-8'); ?></small>
+            <?php endif; ?>
+        </div>
+
+        <div class="form-field <?= $hasFieldError('fuel_type') ? 'has-error' : ''; ?>">
+            <label for="fuel_type">Combustible</label>
+            <select id="fuel_type" name="fuel_type">
+                <?php foreach ($fuelOptions as $option) : ?>
+                    <option value="<?= $option; ?>" <?= ($formData['fuel_type'] ?? '') === $option ? 'selected' : ''; ?>><?= ucfirst($option); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <small class="form-hint">Nafta, diesel, híbrido o eléctrico.</small>
+            <?php if ($hasFieldError('fuel_type')) : ?>
+                <small class="form-error"><?= htmlspecialchars($getFieldError('fuel_type'), ENT_QUOTES, 'UTF-8'); ?></small>
+            <?php endif; ?>
+        </div>
+
+        <details class="form-advanced form-field--full">
+            <summary>Avanzado</summary>
+            <div class="form-advanced__grid">
+                <div class="form-field <?= $hasFieldError('vin') ? 'has-error' : ''; ?>">
+                    <label for="vin">VIN</label>
+                    <input type="text" id="vin" name="vin" value="<?= htmlspecialchars($formData['vin'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+                    <small class="form-hint">17 caracteres sin espacios.</small>
+                    <?php if ($hasFieldError('vin')) : ?>
+                        <small class="form-error"><?= htmlspecialchars($getFieldError('vin'), ENT_QUOTES, 'UTF-8'); ?></small>
+                    <?php endif; ?>
+                </div>
+
+                <div class="form-field <?= $hasFieldError('purchased_at') ? 'has-error' : ''; ?>">
+                    <label for="purchased_at">Fecha de compra</label>
+                    <input type="date" id="purchased_at" name="purchased_at" value="<?= htmlspecialchars($formData['purchased_at'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+                    <small class="form-hint">Fecha de compra o alta en la flota.</small>
+                    <?php if ($hasFieldError('purchased_at')) : ?>
+                        <small class="form-error"><?= htmlspecialchars($getFieldError('purchased_at'), ENT_QUOTES, 'UTF-8'); ?></small>
+                    <?php endif; ?>
+                </div>
+
+                <div class="form-field form-field--full <?= $hasFieldError('notes') ? 'has-error' : ''; ?>">
+                    <label for="notes">Notas</label>
+                    <textarea id="notes" name="notes" rows="3"><?= htmlspecialchars($formData['notes'] ?? '', ENT_QUOTES, 'UTF-8'); ?></textarea>
+                    <small class="form-hint">Uso interno. No visible para clientes.</small>
+                    <?php if ($hasFieldError('notes')) : ?>
+                        <small class="form-error"><?= htmlspecialchars($getFieldError('notes'), ENT_QUOTES, 'UTF-8'); ?></small>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </details>
 
         <?php if ($isEdit && !empty($vehicleImages)) : ?>
             <?php $currentCoverId = (int) ($vehicleImages[0]['id'] ?? 0); ?>

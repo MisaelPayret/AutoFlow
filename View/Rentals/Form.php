@@ -32,7 +32,7 @@ include_once __DIR__ . '/../Include/Header.php';
 
     <?php if (!empty($formErrors)) : ?>
         <div class="alert alert-error">
-            <strong>Revisá los campos:</strong>
+            <strong>Revisa los Campos:</strong>
             <ul>
                 <?php foreach ($formErrors as $error) : ?>
                     <li><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></li>
@@ -42,6 +42,7 @@ include_once __DIR__ . '/../Include/Header.php';
     <?php endif; ?>
 
     <form method="POST" action="index.php?route=<?= $actionRoute; ?>" class="form-grid">
+        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token(), ENT_QUOTES, 'UTF-8'); ?>">
         <?php if ($isEdit) : ?>
             <input type="hidden" name="id" value="<?= (int) ($formData['id'] ?? 0); ?>">
         <?php endif; ?>
@@ -74,6 +75,7 @@ include_once __DIR__ . '/../Include/Header.php';
         <div class="form-field <?= $hasFieldError('client_document') ? 'has-error' : ''; ?>">
             <label for="client_document">Documento *</label>
             <input type="text" id="client_document" name="client_document" required value="<?= htmlspecialchars($formData['client_document'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+            <small class="form-hint">CI, DNI, RUT o pasaporte.</small>
             <?php if ($hasFieldError('client_document')) : ?>
                 <small class="form-error">&middot; <?= htmlspecialchars($getFieldError('client_document'), ENT_QUOTES, 'UTF-8'); ?></small>
             <?php endif; ?>
@@ -82,6 +84,7 @@ include_once __DIR__ . '/../Include/Header.php';
         <div class="form-field">
             <label for="client_phone">Teléfono</label>
             <input type="text" id="client_phone" name="client_phone" value="<?= htmlspecialchars($formData['client_phone'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+            <small class="form-hint">Opcional, agregá código de país si aplica.</small>
         </div>
 
         <div class="form-field <?= $hasFieldError('start_date') ? 'has-error' : ''; ?>">
@@ -95,6 +98,7 @@ include_once __DIR__ . '/../Include/Header.php';
         <div class="form-field <?= $hasFieldError('end_date') ? 'has-error' : ''; ?>">
             <label for="end_date">Fin *</label>
             <input type="date" id="end_date" name="end_date" required value="<?= htmlspecialchars($formData['end_date'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+            <small class="form-hint">Debe ser posterior al inicio.</small>
             <?php if ($hasFieldError('end_date')) : ?>
                 <small class="form-error">&middot; <?= htmlspecialchars($getFieldError('end_date'), ENT_QUOTES, 'UTF-8'); ?></small>
             <?php endif; ?>
@@ -144,6 +148,7 @@ include_once __DIR__ . '/../Include/Header.php';
                     <option value="<?= $option; ?>" <?= (($formData['status'] ?? '') === $option) ? 'selected' : ''; ?>><?= ucfirst(str_replace('_', ' ', $option)); ?></option>
                 <?php endforeach; ?>
             </select>
+            <small class="form-hint">Usá borrador hasta confirmar el contrato.</small>
             <?php if ($hasFieldError('status')) : ?>
                 <small class="form-error">&middot; <?= htmlspecialchars($getFieldError('status'), ENT_QUOTES, 'UTF-8'); ?></small>
             <?php endif; ?>

@@ -36,6 +36,73 @@ class RentalModel extends BaseModel
     }
 
     /**
+     * Lista alquileres asociados a un cliente por documento o nombre.
+     */
+    public function listByClient(string $identifier, int $limit = 50, int $offset = 0): array
+    {
+        $sql =
+            'SELECT r.*, v.brand, v.model, v.license_plate
+             FROM `rentals` AS r
+             INNER JOIN `vehicles` AS v ON v.id = r.vehicle_id
+             WHERE (r.`client_document` = :identifier OR r.`client_name` LIKE :name)
+             ORDER BY r.`start_date` DESC
+             LIMIT :limit OFFSET :offset';
+
+        $statement = $this->pdo->prepare($sql);
+        $statement->bindValue(':identifier', $identifier);
+        $statement->bindValue(':name', '%' . $identifier . '%');
+        $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $statement->execute();
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * Cuenta alquileres para un cliente.
+     */
+    public function countByClient(string $identifier): int
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM `rentals`
+             WHERE `client_document` = :identifier OR `client_name` LIKE :name'
+        );
+        $statement->execute([
+            'identifier' => $identifier,
+            'name' => '%' . $identifier . '%',
+        ]);
+
+        return (int) $statement->fetchColumn();
+    }
+
+    /**
+     * Resume totales y fechas para el historial de un cliente.
+     */
+    public function clientSummary(string $identifier): array
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT
+                COUNT(*) AS total_rentals,
+                COALESCE(SUM(`total_amount`), 0) AS total_amount,
+                MAX(`end_date`) AS last_end_date
+             FROM `rentals`
+             WHERE `client_document` = :identifier OR `client_name` LIKE :name'
+        );
+        $statement->execute([
+            'identifier' => $identifier,
+            'name' => '%' . $identifier . '%',
+        ]);
+
+        $summary = $statement->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        return [
+            'totalRentals' => (int) ($summary['total_rentals'] ?? 0),
+            'totalAmount' => (float) ($summary['total_amount'] ?? 0),
+            'lastEndDate' => $summary['last_end_date'] ?? null,
+        ];
+    }
+
+    /**
      * Busca alquileres aplicando filtros avanzados.
      */
     public function search(array $filters = [], int $limit = 50, int $offset = 0): array

@@ -23,6 +23,87 @@ class VehicleObligationModel extends BaseModel
     }
 
     /**
+     * Lista obligaciones con datos del vehiculo.
+     */
+    public function listWithVehicles(array $filters = [], int $limit = 50, int $offset = 0): array
+    {
+        $sql =
+            'SELECT o.*, v.brand, v.model, v.license_plate
+             FROM `vehicle_obligations` AS o
+             INNER JOIN `vehicles` AS v ON v.id = o.vehicle_id
+             WHERE 1=1';
+        $params = [];
+        $sql .= $this->buildFilterSql($filters, $params);
+        $sql .= ' ORDER BY o.`due_date` ASC, o.`created_at` DESC LIMIT :limit OFFSET :offset';
+
+        $statement = $this->pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $statement->bindValue(':' . $key, $value);
+        }
+        $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $statement->execute();
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * Cuenta obligaciones segun filtros.
+     */
+    public function count(array $filters = []): int
+    {
+        $sql =
+            'SELECT COUNT(*)
+             FROM `vehicle_obligations` AS o
+             INNER JOIN `vehicles` AS v ON v.id = o.vehicle_id
+             WHERE 1=1';
+        $params = [];
+        $sql .= $this->buildFilterSql($filters, $params);
+
+        $statement = $this->pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $statement->bindValue(':' . $key, $value);
+        }
+        $statement->execute();
+
+        return (int) $statement->fetchColumn();
+    }
+
+    /**
+     * Resumen rápido de estados y montos.
+     */
+    public function summary(array $filters = []): array
+    {
+        $sql =
+            'SELECT
+                COUNT(*) AS total_records,
+                COALESCE(SUM(o.`amount`), 0) AS total_amount,
+                SUM(CASE WHEN o.`status` = "pending" THEN 1 ELSE 0 END) AS pending_count,
+                SUM(CASE WHEN o.`status` = "overdue" THEN 1 ELSE 0 END) AS overdue_count,
+                SUM(CASE WHEN o.`status` = "paid" THEN 1 ELSE 0 END) AS paid_count
+             FROM `vehicle_obligations` AS o
+             INNER JOIN `vehicles` AS v ON v.id = o.vehicle_id
+             WHERE 1=1';
+        $params = [];
+        $sql .= $this->buildFilterSql($filters, $params);
+
+        $statement = $this->pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $statement->bindValue(':' . $key, $value);
+        }
+        $statement->execute();
+        $row = $statement->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        return [
+            'totalRecords' => (int) ($row['total_records'] ?? 0),
+            'totalAmount' => (float) ($row['total_amount'] ?? 0),
+            'pendingCount' => (int) ($row['pending_count'] ?? 0),
+            'overdueCount' => (int) ($row['overdue_count'] ?? 0),
+            'paidCount' => (int) ($row['paid_count'] ?? 0),
+        ];
+    }
+
+    /**
      * Lista obligaciones por vehiculo.
      */
     public function listByVehicle(int $vehicleId): array
@@ -54,6 +135,7 @@ class VehicleObligationModel extends BaseModel
      */
     public function create(array $data): int
     {
+        $data = $this->applyStatusRules($data);
         $statement = $this->pdo->prepare(
             'INSERT INTO `vehicle_obligations`
             (vehicle_id, obligation_type, due_date, amount, status, paid_at, notes)
@@ -79,6 +161,7 @@ class VehicleObligationModel extends BaseModel
      */
     public function update(int $id, array $data): void
     {
+        $data = $this->applyStatusRules($data);
         $statement = $this->pdo->prepare(
             'UPDATE `vehicle_obligations` SET
                 vehicle_id = :vehicle_id,
@@ -137,7 +220,7 @@ class VehicleObligationModel extends BaseModel
             $status = 'pending';
         }
 
-        return [
+        $data = [
             'vehicle_id' => (int) ($input['vehicle_id'] ?? 0),
             'obligation_type' => $type,
             'due_date' => $this->normalizeNullableDate($input['due_date'] ?? null),
@@ -146,6 +229,8 @@ class VehicleObligationModel extends BaseModel
             'paid_at' => $this->normalizeNullableDate($input['paid_at'] ?? null),
             'notes' => trim((string) ($input['notes'] ?? '')),
         ];
+
+        return $this->applyStatusRules($data);
     }
 
     public function validate(array $data): array
@@ -164,7 +249,75 @@ class VehicleObligationModel extends BaseModel
             $errors['amount'] = 'El monto debe ser positivo.';
         }
 
+        if ($data['status'] === 'paid' && $data['paid_at'] === null) {
+            $errors['paid_at'] = 'Ingresá la fecha de pago.';
+        }
+
         return $errors;
+    }
+
+    private function buildFilterSql(array $filters, array &$params): string
+    {
+        $sql = '';
+
+        if (!empty($filters['search'])) {
+            $sql .= ' AND (
+                v.`brand` LIKE :search
+                OR v.`model` LIKE :search
+                OR v.`license_plate` LIKE :search
+            )';
+            $params['search'] = '%' . $filters['search'] . '%';
+        }
+
+        if (!empty($filters['vehicle_id'])) {
+            $sql .= ' AND o.`vehicle_id` = :vehicle_id';
+            $params['vehicle_id'] = (int) $filters['vehicle_id'];
+        }
+
+        if (!empty($filters['obligation_type']) && in_array($filters['obligation_type'], self::TYPE_OPTIONS, true)) {
+            $sql .= ' AND o.`obligation_type` = :obligation_type';
+            $params['obligation_type'] = $filters['obligation_type'];
+        }
+
+        if (!empty($filters['status']) && in_array($filters['status'], self::STATUS_OPTIONS, true)) {
+            $sql .= ' AND o.`status` = :status';
+            $params['status'] = $filters['status'];
+        }
+
+        if (!empty($filters['date_from'])) {
+            $sql .= ' AND o.`due_date` >= :date_from';
+            $params['date_from'] = $filters['date_from'];
+        }
+
+        if (!empty($filters['date_to'])) {
+            $sql .= ' AND o.`due_date` <= :date_to';
+            $params['date_to'] = $filters['date_to'];
+        }
+
+        return $sql;
+    }
+
+    private function applyStatusRules(array $data): array
+    {
+        $today = date('Y-m-d');
+
+        if ($data['status'] !== 'paid') {
+            $data['paid_at'] = null;
+        }
+
+        if ($data['status'] === 'paid' && $data['paid_at'] === null) {
+            $data['paid_at'] = $today;
+        }
+
+        if ($data['status'] === 'pending' && $data['due_date'] !== null && $data['due_date'] < $today) {
+            $data['status'] = 'overdue';
+        }
+
+        if ($data['status'] === 'overdue' && $data['due_date'] !== null && $data['due_date'] >= $today) {
+            $data['status'] = 'pending';
+        }
+
+        return $data;
     }
 
     private function normalizeMoney($value): string

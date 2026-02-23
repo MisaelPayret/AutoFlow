@@ -9,6 +9,15 @@ require_once __DIR__ . '/BaseModel.php';
  */
 class MaintenanceModel extends BaseModel
 {
+    private const STATUS_OPTIONS = ['pending', 'in_progress', 'completed'];
+
+    /**
+     * Opciones válidas para el estado del mantenimiento.
+     */
+    public function getStatusOptions(): array
+    {
+        return self::STATUS_OPTIONS;
+    }
     /**
      * Devuelve todos los servicios junto al vehículo relacionado.
      */
@@ -72,6 +81,39 @@ class MaintenanceModel extends BaseModel
     }
 
     /**
+     * Resume costos y fechas segun filtros.
+     */
+    public function summary(array $filters = []): array
+    {
+        $sql =
+            'SELECT
+                COUNT(*) AS total_records,
+                COALESCE(SUM(m.`cost`), 0) AS total_cost,
+                COALESCE(AVG(m.`cost`), 0) AS avg_cost,
+                MAX(m.`service_date`) AS last_service_date
+             FROM `maintenance_records` AS m
+             INNER JOIN `vehicles` AS v ON v.id = m.vehicle_id
+             WHERE 1=1';
+        $params = [];
+        $sql .= $this->buildFilterSql($filters, $params);
+
+        $statement = $this->pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $statement->bindValue(':' . $key, $value);
+        }
+        $statement->execute();
+
+        $row = $statement->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        return [
+            'totalRecords' => (int) ($row['total_records'] ?? 0),
+            'totalCost' => (float) ($row['total_cost'] ?? 0),
+            'avgCost' => (float) ($row['avg_cost'] ?? 0),
+            'lastServiceDate' => $row['last_service_date'] ?? null,
+        ];
+    }
+
+    /**
      * Construye condiciones WHERE segun filtros.
      */
     private function buildFilterSql(array $filters, array &$params): string
@@ -103,6 +145,11 @@ class MaintenanceModel extends BaseModel
             $params['date_to'] = $filters['date_to'];
         }
 
+        if (!empty($filters['status']) && in_array($filters['status'], self::STATUS_OPTIONS, true)) {
+            $sql .= ' AND m.`status` = :status';
+            $params['status'] = $filters['status'];
+        }
+
         return $sql;
     }
 
@@ -125,8 +172,8 @@ class MaintenanceModel extends BaseModel
     {
         $statement = $this->pdo->prepare(
             'INSERT INTO `maintenance_records`
-             (vehicle_id, service_type, description, service_date, mileage_km, cost, next_service_date)
-             VALUES (:vehicle_id, :service_type, :description, :service_date, :mileage_km, :cost, :next_service_date)'
+             (vehicle_id, service_type, description, service_date, mileage_km, cost, status, next_service_date)
+             VALUES (:vehicle_id, :service_type, :description, :service_date, :mileage_km, :cost, :status, :next_service_date)'
         );
 
         $statement->execute([
@@ -136,6 +183,7 @@ class MaintenanceModel extends BaseModel
             'service_date' => $data['service_date'],
             'mileage_km' => $data['mileage_km'],
             'cost' => $data['cost'],
+            'status' => $data['status'],
             'next_service_date' => $data['next_service_date'],
         ]);
 
@@ -155,6 +203,7 @@ class MaintenanceModel extends BaseModel
                 service_date = :service_date,
                 mileage_km = :mileage_km,
                 cost = :cost,
+                status = :status,
                 next_service_date = :next_service_date
              WHERE id = :id'
         );
@@ -166,6 +215,7 @@ class MaintenanceModel extends BaseModel
             'service_date' => $data['service_date'],
             'mileage_km' => $data['mileage_km'],
             'cost' => $data['cost'],
+            'status' => $data['status'],
             'next_service_date' => $data['next_service_date'],
             'id' => $id,
         ]);
@@ -192,6 +242,7 @@ class MaintenanceModel extends BaseModel
             'service_date' => date('Y-m-d'),
             'mileage_km' => null,
             'cost' => '0.00',
+            'status' => 'pending',
             'next_service_date' => null,
         ];
     }
@@ -212,6 +263,7 @@ class MaintenanceModel extends BaseModel
             'cost' => isset($input['cost']) && $input['cost'] !== ''
                 ? number_format((float) $input['cost'], 2, '.', '')
                 : '0.00',
+            'status' => trim((string) ($input['status'] ?? 'pending')),
             'next_service_date' => trim((string) ($input['next_service_date'] ?? '')) ?: null,
         ];
 
@@ -247,6 +299,10 @@ class MaintenanceModel extends BaseModel
 
         if (!is_numeric($data['cost']) || (float) $data['cost'] < 0) {
             $errors['cost'] = 'El costo debe ser un valor positivo.';
+        }
+
+        if (!in_array($data['status'], self::STATUS_OPTIONS, true)) {
+            $errors['status'] = 'Seleccioná un estado válido.';
         }
 
         if ($data['next_service_date'] !== null && !$this->isValidDate($data['next_service_date'])) {

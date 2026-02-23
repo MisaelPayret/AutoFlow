@@ -4,6 +4,7 @@
 $basePath = dirname(__DIR__);
 require_once $basePath . '/Database/Database.php';
 require_once $basePath . '/Model/AlertModel.php';
+require_once $basePath . '/Core/View.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -16,11 +17,20 @@ if (!is_array($routes)) {
     return;
 }
 
+$renderNotFound = static function (string $route): void {
+    http_response_code(404);
+    View::render('Public/NotFound.php', [
+        'pageTitle' => 'Pagina no encontrada | AutoFlow',
+        'bodyClass' => 'public-page notfound-page',
+        'requestPath' => $route,
+    ]);
+};
+
 // Si no llega parámetro usamos auth/login para forzar autenticación.
 $route = trim((string)($_GET['route'] ?? 'auth/login')) ?: 'auth/login';
 
 if (!isset($routes[$route]) || !is_array($routes[$route])) {
-    echo "❌ Ruta '$route' no registrada.";
+    $renderNotFound($route);
     return;
 }
 
@@ -28,7 +38,7 @@ $controllerName = $routes[$route]['controller'] ?? null;
 $action = $routes[$route]['action'] ?? null;
 
 if (!$controllerName || !$action) {
-    echo "❌ Ruta '$route' está mal configurada.";
+    $renderNotFound($route);
     return;
 }
 
@@ -36,7 +46,7 @@ if (!$controllerName || !$action) {
 $controllerFile = $basePath . "/Controller/{$controllerName}Controller.php";
 
 if (!is_file($controllerFile)) {
-    echo "❌ Controlador '$controllerFile' no encontrado.";
+    $renderNotFound($route);
     return;
 }
 
@@ -44,7 +54,7 @@ require_once $controllerFile;
 $className = $controllerName . 'Controller';
 
 if (!class_exists($className)) {
-    echo "❌ Clase '$className' no existe.";
+    $renderNotFound($route);
     return;
 }
 
@@ -63,7 +73,7 @@ if (!empty($_SESSION['auth_user_id']) && (time() - (int) $lastAlertRun) > 3600) 
 $controller = new $className();
 
 if (!method_exists($controller, $action)) {
-    echo "❌ Acción '$action' no encontrada.";
+    $renderNotFound($route);
     return;
 }
 

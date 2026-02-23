@@ -1,6 +1,7 @@
 <?php
 
 require_once dirname(__DIR__) . '/Database/Database.php';
+require_once dirname(__DIR__) . '/Core/AuthGuard.php';
 require_once dirname(__DIR__) . '/Core/View.php';
 require_once dirname(__DIR__) . '/Model/AuditLogModel.php';
 
@@ -27,7 +28,7 @@ class AuditController
      */
     public function index(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
 
         $filters = [
             'search' => trim((string) ($_GET['search'] ?? '')),
@@ -64,19 +65,5 @@ class AuditController
             'pageTitle' => 'Auditoria | AutoFlow',
             'bodyClass' => 'dashboard-page audit-page',
         ]);
-    }
-
-    private function ensureAuthenticated(): void
-    {
-        if (empty($_SESSION['auth_user_id'])) {
-            $this->redirectToRoute('auth/login');
-        }
-    }
-
-    private function redirectToRoute(string $route): void
-    {
-        $location = 'index.php?route=' . rawurlencode($route);
-        header('Location: ' . $location);
-        exit;
     }
 }

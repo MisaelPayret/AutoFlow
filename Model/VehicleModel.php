@@ -105,6 +105,21 @@ class VehicleModel extends BaseModel
             $params['status'] = $filters['status'];
         }
 
+        if (!empty($filters['year'])) {
+            $sql .= ' AND v.`year` = :year';
+            $params['year'] = (int) $filters['year'];
+        }
+
+        if (!empty($filters['availability'])) {
+            if ($filters['availability'] === 'available') {
+                $sql .= ' AND v.`status` = :availability_status';
+                $params['availability_status'] = 'available';
+            } elseif ($filters['availability'] === 'unavailable') {
+                $sql .= ' AND v.`status` <> :availability_status';
+                $params['availability_status'] = 'available';
+            }
+        }
+
         return $sql;
     }
 
@@ -227,8 +242,8 @@ class VehicleModel extends BaseModel
             $errors['status'] = 'Estado inválido.';
         }
 
-        if ($data['daily_rate'] !== '' && !is_numeric($data['daily_rate'])) {
-            $errors['daily_rate'] = 'La tarifa diaria debe ser numérica.';
+        if ($data['daily_rate'] !== '' && (!is_numeric($data['daily_rate']) || (float) $data['daily_rate'] < 0)) {
+            $errors['daily_rate'] = 'La tarifa diaria debe ser un valor positivo.';
         }
 
         if ($data['mileage_km'] !== '' && (!ctype_digit((string) $data['mileage_km']) || (int) $data['mileage_km'] < 0)) {
@@ -305,12 +320,101 @@ class VehicleModel extends BaseModel
     }
 
     /**
+     * Cambia solo el estado del vehiculo.
+     */
+    public function updateStatus(int $vehicleId, string $status): void
+    {
+        if ($vehicleId <= 0 || !in_array($status, self::STATUS_OPTIONS, true)) {
+            return;
+        }
+
+        $statement = $this->pdo->prepare('UPDATE `vehicles` SET `status` = :status WHERE `id` = :id');
+        $statement->execute([
+            'status' => $status,
+            'id' => $vehicleId,
+        ]);
+    }
+
+    /**
      * Elimina definitivamente el registro.
      */
     public function delete(int $id): void
     {
         $statement = $this->pdo->prepare('DELETE FROM `vehicles` WHERE `id` = :id');
         $statement->execute(['id' => $id]);
+    }
+
+    /**
+     * Cuenta alquileres asociados al vehiculo (bloquea la eliminación).
+     */
+    public function countRentalsForVehicle(int $vehicleId): int
+    {
+        if ($vehicleId <= 0) {
+            return 0;
+        }
+
+        $statement = $this->pdo->prepare('SELECT COUNT(*) FROM `rentals` WHERE `vehicle_id` = :vehicle_id');
+        $statement->execute(['vehicle_id' => $vehicleId]);
+
+        return (int) $statement->fetchColumn();
+    }
+
+    /**
+     * Genera un padrón automático cuando no se ingresa manualmente.
+     */
+    public function generateInternalCode(): string
+    {
+        $nextId = (int) $this->pdo->query('SELECT COALESCE(MAX(`id`), 0) + 1 FROM `vehicles`')->fetchColumn();
+
+        for ($i = 0; $i < 5; $i++) {
+            $candidate = 'AF-' . str_pad((string) ($nextId + $i), 6, '0', STR_PAD_LEFT);
+            if (!$this->internalCodeExists($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return 'AF-' . date('ymdHis');
+    }
+
+    /**
+     * Actualiza el estado segun el estado del alquiler cuando aplica.
+     */
+    public function updateStatusFromRental(int $vehicleId, string $rentalStatus): void
+    {
+        if ($vehicleId <= 0) {
+            return;
+        }
+
+        $statement = $this->pdo->prepare('SELECT `status` FROM `vehicles` WHERE `id` = :id');
+        $statement->execute(['id' => $vehicleId]);
+        $currentStatus = (string) $statement->fetchColumn();
+
+        if (in_array($currentStatus, ['maintenance', 'retired'], true)) {
+            return;
+        }
+
+        $mapping = [
+            'confirmed' => 'reserved',
+            'in_progress' => 'rented',
+            'completed' => 'available',
+            'cancelled' => 'available',
+            'draft' => 'available',
+        ];
+
+        if (!isset($mapping[$rentalStatus])) {
+            return;
+        }
+
+        $nextStatus = $mapping[$rentalStatus];
+        if ($nextStatus === $currentStatus) {
+            return;
+        }
+
+        $update = $this->pdo->prepare('UPDATE `vehicles` SET `status` = :status WHERE `id` = :id');
+        $update->execute([
+            'status' => $nextStatus,
+            'id' => $vehicleId,
+        ]);
     }
 
     /**
@@ -339,6 +443,28 @@ class VehicleModel extends BaseModel
         );
         $statement->execute([
             'mileage_km' => $mileageKm,
+            'id' => $vehicleId,
+        ]);
+    }
+
+    /**
+     * Actualiza las fechas/km estimados del proximo servicio.
+     */
+    public function updateNextService(int $vehicleId, ?string $nextDate, ?int $nextKm): void
+    {
+        if ($vehicleId <= 0) {
+            return;
+        }
+
+        $statement = $this->pdo->prepare(
+            'UPDATE `vehicles`
+             SET `next_service_date` = :next_service_date,
+                 `next_service_km` = :next_service_km
+             WHERE `id` = :id'
+        );
+        $statement->execute([
+            'next_service_date' => $nextDate ?: null,
+            'next_service_km' => $nextKm,
             'id' => $vehicleId,
         ]);
     }
@@ -589,6 +715,17 @@ class VehicleModel extends BaseModel
             'purchased_at' => $data['purchased_at'] !== '' ? $data['purchased_at'] : null,
             'notes' => $data['notes'] ?: null,
         ];
+    }
+
+    /**
+     * Verifica si ya existe un padrón en la base.
+     */
+    private function internalCodeExists(string $code): bool
+    {
+        $statement = $this->pdo->prepare('SELECT COUNT(*) FROM `vehicles` WHERE `internal_code` = :code');
+        $statement->execute(['code' => $code]);
+
+        return (int) $statement->fetchColumn() > 0;
     }
 
     /**

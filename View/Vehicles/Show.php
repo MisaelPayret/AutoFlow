@@ -27,7 +27,7 @@ include_once __DIR__ . '/../Include/Header.php';
             <h1><?= htmlspecialchars($vehicle['brand'] . ' ' . $vehicle['model'], ENT_QUOTES, 'UTF-8'); ?></h1>
             <p><?= htmlspecialchars($vehicle['license_plate'], ENT_QUOTES, 'UTF-8'); ?> · Año <?= (int) $vehicle['year']; ?></p>
             <div class="vehicle-detail__tags">
-                <span class="tag tag-status">Estado: <?= htmlspecialchars($vehicle['status'], ENT_QUOTES, 'UTF-8'); ?></span>
+                <span class="tag tag-status tag-status--<?= htmlspecialchars($vehicle['status'], ENT_QUOTES, 'UTF-8'); ?>">Estado: <?= htmlspecialchars($vehicle['status'], ENT_QUOTES, 'UTF-8'); ?></span>
                 <span class="tag">Transmisión: <?= htmlspecialchars($vehicle['transmission'], ENT_QUOTES, 'UTF-8'); ?></span>
                 <span class="tag">Combustible: <?= htmlspecialchars($vehicle['fuel_type'], ENT_QUOTES, 'UTF-8'); ?></span>
             </div>
@@ -37,6 +37,7 @@ include_once __DIR__ . '/../Include/Header.php';
             </div>
             <div class="hero-actions">
                 <a class="btn ghost" href="index.php?route=vehicles">Volver al listado</a>
+                <a class="btn ghost" href="index.php?route=vehicles/edit&id=<?= (int) $vehicle['id']; ?>">Editar</a>
             </div>
         </div>
     </section>
@@ -57,6 +58,13 @@ include_once __DIR__ . '/../Include/Header.php';
     <?php endif; ?>
 
     <section class="vehicle-detail__grid">
+        <article class="vehicle-detail__card">
+            <h2>Acciones rápidas</h2>
+            <div class="hero-actions">
+                <a class="btn primary" href="index.php?route=rentals/create&vehicle_id=<?= (int) $vehicle['id']; ?>">Registrar alquiler</a>
+                <a class="btn ghost" href="index.php?route=maintenance/create&vehicle_id=<?= (int) $vehicle['id']; ?>">Registrar mantenimiento</a>
+            </div>
+        </article>
         <article class="vehicle-detail__card">
             <h2>Ficha técnica</h2>
             <ul class="vehicle-detail__spec-list">

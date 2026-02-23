@@ -1,9 +1,12 @@
 <?php
 
 require_once dirname(__DIR__) . '/Database/Database.php';
+require_once dirname(__DIR__) . '/Core/Csrf.php';
+require_once dirname(__DIR__) . '/Core/AuthGuard.php';
 require_once dirname(__DIR__) . '/Core/View.php';
 require_once dirname(__DIR__) . '/Model/AuditLogModel.php';
 require_once dirname(__DIR__) . '/Model/MaintenanceModel.php';
+require_once dirname(__DIR__) . '/Model/MaintenancePlanModel.php';
 require_once dirname(__DIR__) . '/Model/VehicleModel.php';
 
 /**
@@ -17,6 +20,7 @@ class MaintenanceController
     private Database $database;
     private AuditLogModel $auditLogs;
     private MaintenanceModel $maintenanceModel;
+    private MaintenancePlanModel $maintenancePlans;
     private VehicleModel $vehicleModel;
 
     public function __construct()
@@ -28,6 +32,7 @@ class MaintenanceController
         $this->database = new Database();
         $connection = $this->database->getConnection();
         $this->maintenanceModel = new MaintenanceModel($connection);
+        $this->maintenancePlans = new MaintenancePlanModel($connection);
         $this->vehicleModel = new VehicleModel($connection);
         $this->auditLogs = new AuditLogModel($connection);
     }
@@ -37,14 +42,19 @@ class MaintenanceController
      */
     public function index(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
 
         $filters = [
             'search' => trim((string) ($_GET['search'] ?? '')),
             'vehicle_id' => trim((string) ($_GET['vehicle_id'] ?? '')),
-            'date_from' => trim((string) ($_GET['date_from'] ?? '')),
-            'date_to' => trim((string) ($_GET['date_to'] ?? '')),
+            'date_from' => $this->sanitizeDateFilter($_GET['date_from'] ?? ''),
+            'date_to' => $this->sanitizeDateFilter($_GET['date_to'] ?? ''),
+            'status' => trim((string) ($_GET['status'] ?? '')),
         ];
+        $statusOptions = $this->maintenanceModel->getStatusOptions();
+        if (!in_array($filters['status'], $statusOptions, true)) {
+            $filters['status'] = '';
+        }
 
         $page = max(1, (int) ($_GET['page'] ?? 1));
         $perPage = 50;
@@ -54,13 +64,18 @@ class MaintenanceController
         $offset = ($page - 1) * $perPage;
 
         $records = $this->maintenanceModel->search($filters, $perPage, $offset);
+        $summary = $this->maintenanceModel->summary($filters);
+        $overdueCount = $this->maintenanceModel->countOverdue();
         $flashMessage = $_SESSION['maintenance_flash'] ?? null;
         unset($_SESSION['maintenance_flash']);
 
         View::render('Maintenance/Index.php', [
             'records' => $records,
             'flashMessage' => $flashMessage,
+            'summary' => $summary,
+            'overdueCount' => $overdueCount,
             'vehicles' => $this->vehicleModel->vehicleOptions(),
+            'statusOptions' => $statusOptions,
             'filters' => $filters,
             'pagination' => [
                 'page' => $page,
@@ -76,17 +91,26 @@ class MaintenanceController
      */
     public function create(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
 
         [$formData, $formErrors] = $this->pullFormState();
         if (empty($formData)) {
             $formData = $this->maintenanceModel->defaultFormData();
         }
 
+        $prefillVehicleId = (int) ($_GET['vehicle_id'] ?? 0);
+        if ($prefillVehicleId > 0) {
+            $vehicle = $this->vehicleModel->find($prefillVehicleId);
+            if ($vehicle) {
+                $formData['vehicle_id'] = $prefillVehicleId;
+            }
+        }
+
         View::render('Maintenance/Form.php', [
             'formData' => $formData,
             'formErrors' => $formErrors,
             'vehicles' => $this->vehicleModel->vehicleOptions(),
+            'statusOptions' => $this->maintenanceModel->getStatusOptions(),
             'isEdit' => false,
             'pageTitle' => 'Registrar mantenimiento | AutoFlow',
             'bodyClass' => 'dashboard-page maintenance-page',
@@ -98,7 +122,7 @@ class MaintenanceController
      */
     public function store(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
         $this->assertPostRequest();
 
         $formData = $this->maintenanceModel->normalizeInput($_POST);
@@ -110,6 +134,7 @@ class MaintenanceController
         }
 
         $recordId = $this->maintenanceModel->create($formData);
+        $this->applyVehicleMaintenanceEffects($formData);
         $this->logAudit('create', 'maintenance', $recordId, null, $formData, 'Alta de mantenimiento');
 
         $_SESSION['maintenance_flash'] = 'Mantenimiento registrado correctamente.';
@@ -121,7 +146,7 @@ class MaintenanceController
      */
     public function edit(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
 
         $recordId = (int) ($_GET['id'] ?? 0);
         $record = $this->maintenanceModel->find($recordId);
@@ -140,6 +165,7 @@ class MaintenanceController
             'formData' => $record,
             'formErrors' => $formErrors,
             'vehicles' => $this->vehicleModel->vehicleOptions(),
+            'statusOptions' => $this->maintenanceModel->getStatusOptions(),
             'isEdit' => true,
             'pageTitle' => 'Editar mantenimiento | AutoFlow',
             'bodyClass' => 'dashboard-page maintenance-page',
@@ -151,7 +177,7 @@ class MaintenanceController
      */
     public function update(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
         $this->assertPostRequest();
 
         $recordId = (int) ($_POST['id'] ?? 0);
@@ -169,6 +195,7 @@ class MaintenanceController
         }
 
         $this->maintenanceModel->update($recordId, $formData);
+        $this->applyVehicleMaintenanceEffects($formData);
         $this->logAudit('update', 'maintenance', $recordId, $record, $formData, 'Edición de mantenimiento');
 
         $_SESSION['maintenance_flash'] = 'Mantenimiento actualizado.';
@@ -180,7 +207,7 @@ class MaintenanceController
      */
     public function delete(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
         $this->assertPostRequest();
 
         $recordId = (int) ($_POST['id'] ?? 0);
@@ -218,19 +245,17 @@ class MaintenanceController
     /**
      * Garantiza que solo usuarios autenticados accedan a estas acciones.
      */
-    private function ensureAuthenticated(): void
-    {
-        if (empty($_SESSION['auth_user_id'])) {
-            $this->redirectToRoute('auth/login');
-        }
-    }
-
     /**
      * Protección básica para que ciertas rutas solo acepten POST.
      */
     private function assertPostRequest(): void
     {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            $this->redirectToRoute('maintenance');
+        }
+
+        if (!Csrf::validate($_POST['_csrf'] ?? null)) {
+            $_SESSION['maintenance_flash'] = 'La sesión expiró. Volvé a intentarlo.';
             $this->redirectToRoute('maintenance');
         }
     }
@@ -267,5 +292,49 @@ class MaintenanceController
         } catch (Throwable $exception) {
             // No-op: no bloquear flujos por auditoria.
         }
+    }
+
+    /**
+     * Sincroniza kilometraje y proximo servicio en el vehiculo.
+     */
+    private function applyVehicleMaintenanceEffects(array $formData): void
+    {
+        $vehicleId = (int) ($formData['vehicle_id'] ?? 0);
+        if ($vehicleId <= 0) {
+            return;
+        }
+
+        if ($formData['mileage_km'] !== null) {
+            $this->vehicleModel->updateMileage($vehicleId, (int) $formData['mileage_km']);
+        }
+
+        $this->vehicleModel->updateNextService(
+            $vehicleId,
+            $formData['next_service_date'] ?? null,
+            null
+        );
+
+        if (($formData['status'] ?? '') === 'completed') {
+            $serviceType = (string) ($formData['service_type'] ?? '');
+            $serviceDate = $formData['service_date'] ?? null;
+            $serviceKm = $formData['mileage_km'] ?? null;
+            $this->maintenancePlans->updateFromMaintenance(
+                $vehicleId,
+                $serviceType,
+                $serviceDate,
+                $serviceKm !== null ? (int) $serviceKm : null
+            );
+        }
+    }
+
+    private function sanitizeDateFilter($value): string
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return '';
+        }
+
+        $date = DateTime::createFromFormat('Y-m-d', $value);
+        return $date instanceof DateTime && $date->format('Y-m-d') === $value ? $value : '';
     }
 }

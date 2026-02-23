@@ -144,7 +144,7 @@ class Database
                 `name` VARCHAR(120) NOT NULL,
                 `email` VARCHAR(190) NOT NULL UNIQUE,
                 `password_hash` VARCHAR(255) NOT NULL,
-                `role` ENUM("owner", "staff", "admin", "client") NOT NULL DEFAULT "owner",
+                `role` ENUM("admin", "client") NOT NULL DEFAULT "client",
                 `last_login_at` DATETIME NULL,
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -203,6 +203,7 @@ class Database
 				`service_date` DATE NOT NULL,
 				`mileage_km` INT UNSIGNED NULL,
 				`cost` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                `status` ENUM("pending", "in_progress", "completed") NOT NULL DEFAULT "pending",
 				`next_service_date` DATE NULL,
 				`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 				CONSTRAINT `fk_maintenance_vehicle`
@@ -381,6 +382,8 @@ class Database
         $this->ensureRentalColumn('odometer_start_km', 'INT UNSIGNED NULL', 'end_date');
         $this->ensureRentalColumn('odometer_end_km', 'INT UNSIGNED NULL', 'odometer_start_km');
 
+        $this->ensureMaintenanceColumn('status', 'ENUM("pending", "in_progress", "completed") NOT NULL DEFAULT "pending"', 'cost');
+
         $this->ensureUserRoleEnum();
     }
 
@@ -395,7 +398,10 @@ class Database
 
         try {
             $this->connection->exec(
-                'ALTER TABLE `users` MODIFY `role` ENUM("owner", "staff", "admin", "client") NOT NULL DEFAULT "owner"'
+                "UPDATE `users` SET `role` = 'admin' WHERE `role` IN ('owner', 'staff')"
+            );
+            $this->connection->exec(
+                'ALTER TABLE `users` MODIFY `role` ENUM("admin", "client") NOT NULL DEFAULT "client"'
             );
         } catch (PDOException $exception) {
             // Ignore enum update failures for older MySQL versions.
@@ -431,6 +437,20 @@ class Database
 
         $this->connection->exec(
             sprintf('ALTER TABLE `vehicles` ADD `%s` %s AFTER `%s`', $column, $definition, $afterColumn)
+        );
+    }
+
+    /**
+     * Añade una columna a maintenance_records si aún no existe.
+     */
+    private function ensureMaintenanceColumn(string $column, string $definition, string $afterColumn): void
+    {
+        if ($this->columnExists('maintenance_records', $column)) {
+            return;
+        }
+
+        $this->connection->exec(
+            sprintf('ALTER TABLE `maintenance_records` ADD `%s` %s AFTER `%s`', $column, $definition, $afterColumn)
         );
     }
 
@@ -480,7 +500,7 @@ class Database
             'name' => $name,
             'email' => $email,
             'password_hash' => password_hash($password, PASSWORD_DEFAULT),
-            'role' => 'owner',
+            'role' => 'admin',
         ]);
     }
 }

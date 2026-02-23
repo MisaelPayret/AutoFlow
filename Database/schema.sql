@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     `name` VARCHAR(120) NOT NULL,
     `email` VARCHAR(190) NOT NULL UNIQUE,
     `password_hash` VARCHAR(255) NOT NULL,
-    `role` ENUM("owner", "staff", "admin", "client") NOT NULL DEFAULT "owner",
+    `role` ENUM("admin", "client") NOT NULL DEFAULT "client",
     `last_login_at` DATETIME NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS `maintenance_records` (
     `service_date` DATE NOT NULL,
     `mileage_km` INT UNSIGNED NULL,
     `cost` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    `status` ENUM("pending", "in_progress", "completed") NOT NULL DEFAULT "pending",
     `next_service_date` DATE NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT `fk_maintenance_vehicle`

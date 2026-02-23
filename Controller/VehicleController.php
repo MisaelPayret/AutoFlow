@@ -1,6 +1,8 @@
 <?php
 
 require_once dirname(__DIR__) . '/Database/Database.php';
+require_once dirname(__DIR__) . '/Core/Csrf.php';
+require_once dirname(__DIR__) . '/Core/AuthGuard.php';
 require_once dirname(__DIR__) . '/Core/View.php';
 require_once dirname(__DIR__) . '/Model/AuditLogModel.php';
 require_once dirname(__DIR__) . '/Model/VehicleModel.php';
@@ -41,14 +43,22 @@ class VehicleController
      */
     public function index(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
 
         $filters = [
             'search' => trim((string) ($_GET['search'] ?? '')),
             'status' => trim((string) ($_GET['status'] ?? '')),
+            'year' => trim((string) ($_GET['year'] ?? '')),
+            'availability' => trim((string) ($_GET['availability'] ?? '')),
         ];
         if (!in_array($filters['status'], $this->statusOptions, true)) {
             $filters['status'] = '';
+        }
+        if ($filters['year'] !== '' && !ctype_digit($filters['year'])) {
+            $filters['year'] = '';
+        }
+        if (!in_array($filters['availability'], ['available', 'unavailable', ''], true)) {
+            $filters['availability'] = '';
         }
 
         $page = max(1, (int) ($_GET['page'] ?? 1));
@@ -73,6 +83,8 @@ class VehicleController
             'statusOptions' => $this->statusOptions,
             'search' => $filters['search'],
             'status' => $filters['status'],
+            'year' => $filters['year'],
+            'availability' => $filters['availability'],
             'filters' => $filters,
             'pagination' => [
                 'page' => $page,
@@ -91,7 +103,7 @@ class VehicleController
      */
     public function create(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
         [$formData, $formErrors] = $this->retrieveFormState();
 
         if (empty($formData)) {
@@ -118,10 +130,13 @@ class VehicleController
      */
     public function store(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
         $this->assertPostRequest();
 
         $formData = $this->vehicleModel->normalizeInput($_POST);
+        if ($formData['internal_code'] === '') {
+            $formData['internal_code'] = $this->vehicleModel->generateInternalCode();
+        }
         $errors = $this->vehicleModel->validate($formData);
 
         if (!empty($errors)) {
@@ -150,7 +165,7 @@ class VehicleController
      */
     public function edit(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
 
         $vehicleId = (int) ($_GET['id'] ?? 0);
         if ($vehicleId <= 0) {
@@ -189,7 +204,7 @@ class VehicleController
      */
     public function update(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
         $this->assertPostRequest();
 
         $vehicleId = (int) ($_POST['id'] ?? 0);
@@ -235,11 +250,16 @@ class VehicleController
      */
     public function delete(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
         $this->assertPostRequest();
 
         $vehicleId = (int) ($_POST['id'] ?? 0);
         if ($vehicleId <= 0) {
+            $this->redirectToRoute('vehicles');
+        }
+
+        if ($this->vehicleModel->countRentalsForVehicle($vehicleId) > 0) {
+            $_SESSION['vehicle_flash'] = 'No se puede eliminar el vehículo porque tiene alquileres asociados.';
             $this->redirectToRoute('vehicles');
         }
 
@@ -258,11 +278,44 @@ class VehicleController
     }
 
     /**
+     * Actualiza el estado desde acciones rápidas en el listado.
+     */
+    public function updateStatus(): void
+    {
+        AuthGuard::requireRoles(['admin']);
+        $this->assertPostRequest();
+
+        $vehicleId = (int) ($_POST['id'] ?? 0);
+        $status = trim((string) ($_POST['status'] ?? ''));
+
+        if ($vehicleId <= 0) {
+            $this->redirectToRoute('vehicles');
+        }
+
+        $vehicle = $this->vehicleModel->find($vehicleId);
+        if (!$vehicle) {
+            $_SESSION['vehicle_flash'] = 'Vehículo no encontrado.';
+            $this->redirectToRoute('vehicles');
+        }
+
+        if (!in_array($status, $this->statusOptions, true)) {
+            $_SESSION['vehicle_flash'] = 'Estado inválido.';
+            $this->redirectToRoute('vehicles');
+        }
+
+        $this->vehicleModel->updateStatus($vehicleId, $status);
+        $this->logAudit('update', 'vehicle', $vehicleId, $vehicle, ['status' => $status], 'Cambio de estado');
+
+        $_SESSION['vehicle_flash'] = 'Estado actualizado.';
+        $this->redirectToRoute('vehicles');
+    }
+
+    /**
      * Renderiza una vista detallada pensada para usuarios internos.
      */
     public function show(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
 
         $vehicleId = (int) ($_GET['id'] ?? 0);
         if ($vehicleId <= 0) {
@@ -802,6 +855,10 @@ class VehicleController
                 $errors['license_plate'] = 'Esa patente ya está registrada.';
             }
 
+            if (stripos($message, 'vin') !== false) {
+                $errors['vin'] = 'Ese VIN ya está registrado.';
+            }
+
             if (empty($errors)) {
                 $errors['general'] = 'El registro ya existe.';
             }
@@ -830,19 +887,17 @@ class VehicleController
     /**
      * Bloquea el acceso a usuarios no autenticados.
      */
-    private function ensureAuthenticated(): void
-    {
-        if (empty($_SESSION['auth_user_id'])) {
-            $this->redirectToRoute('auth/login');
-        }
-    }
-
     /**
      * Evita que rutas destructivas se ejecuten por GET.
      */
     private function assertPostRequest(): void
     {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            $this->redirectToRoute('vehicles');
+        }
+
+        if (!Csrf::validate($_POST['_csrf'] ?? null)) {
+            $_SESSION['vehicle_flash'] = 'La sesión expiró. Volvé a intentarlo.';
             $this->redirectToRoute('vehicles');
         }
     }

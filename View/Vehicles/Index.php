@@ -5,6 +5,8 @@ $statusCounts = $statusCounts ?? [];
 $statusOptions = $statusOptions ?? [];
 $search = $search ?? '';
 $status = $status ?? '';
+$year = $year ?? '';
+$availability = $availability ?? '';
 $pagination = $pagination ?? ['page' => 1, 'perPage' => 50, 'total' => 0, 'totalPages' => 1];
 $flashMessage = $flashMessage ?? null;
 $uploadWarnings = $uploadWarnings ?? [];
@@ -70,7 +72,22 @@ include_once __DIR__ . '/../Include/Header.php';
                 <?php endforeach; ?>
             </select>
         </div>
+        <div class="filter-group">
+            <label for="year">Año</label>
+            <input type="number" id="year" name="year" min="1980" max="<?= (int) date('Y') + 1; ?>" value="<?= htmlspecialchars((string) $year, ENT_QUOTES, 'UTF-8'); ?>">
+        </div>
+        <div class="filter-group">
+            <label for="availability">Disponibilidad</label>
+            <select name="availability" id="availability">
+                <option value="">Todas</option>
+                <option value="available" <?= $availability === 'available' ? 'selected' : ''; ?>>Disponibles</option>
+                <option value="unavailable" <?= $availability === 'unavailable' ? 'selected' : ''; ?>>No disponibles</option>
+            </select>
+        </div>
         <button type="submit" class="btn ghost">Filtrar</button>
+        <?php if ($search !== '' || $status !== '' || $year !== '' || $availability !== '') : ?>
+            <a class="btn ghost" href="index.php?route=vehicles">Limpiar</a>
+        <?php endif; ?>
     </form>
 
     <section class="status-summary">
@@ -84,7 +101,12 @@ include_once __DIR__ . '/../Include/Header.php';
     </section>
 
     <?php if (empty($vehicles)) : ?>
-        <p class="empty-state">Todavía no cargaste vehículos. Usá el botón "Nuevo vehículo" para empezar.</p>
+        <?php if ($search !== '' || $status !== '' || $year !== '' || $availability !== '') : ?>
+            <p class="empty-state">No se encontraron vehículos con esos filtros.</p>
+            <a class="btn ghost" href="index.php?route=vehicles">Limpiar filtros</a>
+        <?php else : ?>
+            <p class="empty-state">Todavía no cargaste vehículos. Usá el botón "Nuevo vehículo" para empezar.</p>
+        <?php endif; ?>
     <?php else : ?>
         <div class="table-wrapper">
             <table class="data-table">
@@ -117,19 +139,39 @@ include_once __DIR__ . '/../Include/Header.php';
                                         <span class="vehicle-thumb vehicle-thumb--placeholder"><?= htmlspecialchars($initials, ENT_QUOTES, 'UTF-8'); ?></span>
                                     <?php endif; ?>
                                 </div>
-                                <strong><?= htmlspecialchars($vehicle['brand'] . ' ' . $vehicle['model'], ENT_QUOTES, 'UTF-8'); ?></strong>
-                                <small><?= htmlspecialchars((string) $vehicle['year'], ENT_QUOTES, 'UTF-8'); ?></small>
+                                <div class="vehicle-meta">
+                                    <strong><?= htmlspecialchars($vehicle['brand'] . ' ' . $vehicle['model'], ENT_QUOTES, 'UTF-8'); ?></strong>
+                                    <small><?= htmlspecialchars((string) $vehicle['year'], ENT_QUOTES, 'UTF-8'); ?></small>
+                                    <?php if (empty($vehicle['cover_image'])) : ?>
+                                        <span class="vehicle-badge">Sin fotos</span>
+                                    <?php endif; ?>
+                                </div>
                             </td>
                             <td data-label="Patente"><?= htmlspecialchars($vehicle['license_plate'], ENT_QUOTES, 'UTF-8'); ?></td>
                             <td data-label="Km"><?= number_format((int) $vehicle['mileage_km']); ?> km</td>
                             <td data-label="Carga (kg)"><?= number_format((int) ($vehicle['capacity_kg'] ?? 0)); ?> kg</td>
                             <td data-label="Pasajeros"><?= (int) ($vehicle['passenger_capacity'] ?? 0); ?></td>
-                            <td data-label="Estado"><span class="tag tag-status"><?= htmlspecialchars($vehicle['status'], ENT_QUOTES, 'UTF-8'); ?></span></td>
+                            <td data-label="Estado">
+                                <span class="tag tag-status tag-status--<?= htmlspecialchars($vehicle['status'], ENT_QUOTES, 'UTF-8'); ?>">
+                                    <?= htmlspecialchars($vehicle['status'], ENT_QUOTES, 'UTF-8'); ?>
+                                </span>
+                            </td>
                             <td data-label="Tarifa">$<?= number_format((float) $vehicle['daily_rate'], 2); ?></td>
                             <td data-label="Acciones" class="table-actions">
                                 <a class="table-action-btn table-action-btn--view" href="index.php?route=vehicles/show&id=<?= (int) $vehicle['id']; ?>">Ver</a>
                                 <a class="table-action-btn table-action-btn--edit" href="index.php?route=vehicles/edit&id=<?= (int) $vehicle['id']; ?>">Editar</a>
+                                <form method="POST" action="index.php?route=vehicles/status" class="table-action-inline">
+                                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token(), ENT_QUOTES, 'UTF-8'); ?>">
+                                    <input type="hidden" name="id" value="<?= (int) $vehicle['id']; ?>">
+                                    <select name="status" aria-label="Cambiar estado">
+                                        <?php foreach ($statusOptions as $option) : ?>
+                                            <option value="<?= $option; ?>" <?= $vehicle['status'] === $option ? 'selected' : ''; ?>><?= ucfirst($option); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <button type="submit" class="table-action-btn table-action-btn--muted">Estado</button>
+                                </form>
                                 <form method="POST" action="index.php?route=vehicles/delete" onsubmit="return confirm('¿Eliminar este vehículo?');">
+                                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token(), ENT_QUOTES, 'UTF-8'); ?>">
                                     <input type="hidden" name="id" value="<?= (int) $vehicle['id']; ?>">
                                     <button type="submit" class="table-action-btn table-action-btn--delete">Eliminar</button>
                                 </form>

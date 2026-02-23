@@ -22,6 +22,10 @@ return [
         'controller' => 'Auth',
         'action' => 'logout',
     ],
+    'auth/denied' => [
+        'controller' => 'Auth',
+        'action' => 'accessDenied',
+    ],
     'home' => [
         'controller' => 'Home',
         'action' => 'index',
@@ -58,6 +62,10 @@ return [
         'controller' => 'Vehicle',
         'action' => 'update',
     ],
+    'vehicles/status' => [
+        'controller' => 'Vehicle',
+        'action' => 'updateStatus',
+    ],
     'vehicles/delete' => [
         'controller' => 'Vehicle',
         'action' => 'delete',
@@ -86,9 +94,61 @@ return [
         'controller' => 'Maintenance',
         'action' => 'delete',
     ],
+    'maintenance/plans' => [
+        'controller' => 'MaintenancePlan',
+        'action' => 'index',
+    ],
+    'maintenance/plans/create' => [
+        'controller' => 'MaintenancePlan',
+        'action' => 'create',
+    ],
+    'maintenance/plans/store' => [
+        'controller' => 'MaintenancePlan',
+        'action' => 'store',
+    ],
+    'maintenance/plans/edit' => [
+        'controller' => 'MaintenancePlan',
+        'action' => 'edit',
+    ],
+    'maintenance/plans/update' => [
+        'controller' => 'MaintenancePlan',
+        'action' => 'update',
+    ],
+    'maintenance/plans/delete' => [
+        'controller' => 'MaintenancePlan',
+        'action' => 'delete',
+    ],
+    'obligations' => [
+        'controller' => 'VehicleObligation',
+        'action' => 'index',
+    ],
+    'obligations/create' => [
+        'controller' => 'VehicleObligation',
+        'action' => 'create',
+    ],
+    'obligations/store' => [
+        'controller' => 'VehicleObligation',
+        'action' => 'store',
+    ],
+    'obligations/edit' => [
+        'controller' => 'VehicleObligation',
+        'action' => 'edit',
+    ],
+    'obligations/update' => [
+        'controller' => 'VehicleObligation',
+        'action' => 'update',
+    ],
+    'obligations/delete' => [
+        'controller' => 'VehicleObligation',
+        'action' => 'delete',
+    ],
     'rentals' => [
         'controller' => 'Rental',
         'action' => 'index',
+    ],
+    'rentals/history' => [
+        'controller' => 'Rental',
+        'action' => 'history',
     ],
     'rentals/create' => [
         'controller' => 'Rental',

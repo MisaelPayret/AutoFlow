@@ -12,6 +12,7 @@ $status = $filters['status'] ?? '';
 $vehicleId = $filters['vehicle_id'] ?? '';
 $dateFrom = $filters['date_from'] ?? '';
 $dateTo = $filters['date_to'] ?? '';
+$hasFilters = $search !== '' || $status !== '' || $vehicleId !== '' || $dateFrom !== '' || $dateTo !== '';
 
 include_once __DIR__ . '/../Include/Header.php';
 ?>
@@ -72,6 +73,9 @@ include_once __DIR__ . '/../Include/Header.php';
             <input type="date" id="date_to" name="date_to" value="<?= htmlspecialchars($dateTo, ENT_QUOTES, 'UTF-8'); ?>">
         </div>
         <button type="submit" class="btn ghost">Filtrar</button>
+        <?php if ($hasFilters) : ?>
+            <a class="btn ghost" href="index.php?route=rentals">Limpiar</a>
+        <?php endif; ?>
     </form>
 
     <?php if (empty($rentals)) : ?>
@@ -118,12 +122,25 @@ include_once __DIR__ . '/../Include/Header.php';
                             ?>
                             <td data-label="Duración"><?= $durationDays > 0 ? $durationDays . ' días' : '—'; ?></td>
                             <td data-label="Estado">
-                                <span class="tag tag-status"><?= htmlspecialchars($rental['status'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                <?php
+                                $statusKey = preg_replace('/[^a-z_]/', '', strtolower((string) ($rental['status'] ?? 'pending')));
+                                $statusKey = $statusKey !== '' ? $statusKey : 'pending';
+                                ?>
+                                <span class="tag tag-status tag-status--<?= htmlspecialchars($statusKey, ENT_QUOTES, 'UTF-8'); ?>">
+                                    <?= htmlspecialchars(ucfirst(str_replace('_', ' ', (string) $rental['status'])), ENT_QUOTES, 'UTF-8'); ?>
+                                </span>
                             </td>
                             <td data-label="Total">$<?= number_format((float) $rental['total_amount'], 2); ?></td>
                             <td data-label="Acciones" class="table-actions">
+                                <?php
+                                $clientKey = $rental['client_document'] ?: $rental['client_name'];
+                                ?>
+                                <?php if ($clientKey !== '') : ?>
+                                    <a class="table-action-btn" href="index.php?route=rentals/history&client=<?= htmlspecialchars($clientKey, ENT_QUOTES, 'UTF-8'); ?>">Historial</a>
+                                <?php endif; ?>
                                 <a class="table-action-btn table-action-btn--edit" href="index.php?route=rentals/edit&id=<?= (int) $rental['id']; ?>">Editar</a>
                                 <form method="POST" action="index.php?route=rentals/delete" onsubmit="return confirm('¿Eliminar este alquiler?');">
+                                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token(), ENT_QUOTES, 'UTF-8'); ?>">
                                     <input type="hidden" name="id" value="<?= (int) $rental['id']; ?>">
                                     <button type="submit" class="table-action-btn table-action-btn--delete">Eliminar</button>
                                 </form>

@@ -1,6 +1,7 @@
 <?php
 
 require_once dirname(__DIR__) . '/Database/Database.php';
+require_once dirname(__DIR__) . '/Core/AuthGuard.php';
 require_once dirname(__DIR__) . '/Core/View.php';
 require_once dirname(__DIR__) . '/Model/MaintenanceModel.php';
 require_once dirname(__DIR__) . '/Model/RentalModel.php';
@@ -37,9 +38,7 @@ class HomeController
      */
     public function index(): void
     {
-        if (empty($_SESSION['auth_user_id'])) {
-            $this->redirectToRoute('auth/login');
-        }
+        AuthGuard::requireRoles(['admin']);
 
         View::render('Public/Home.php', [
             'stats' => $this->getDashboardStats(),

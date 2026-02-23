@@ -1,4 +1,5 @@
 <?php
+require_once dirname(__DIR__, 2) . '/Core/Csrf.php';
 $pageTitle = $pageTitle ?? 'AutoFlow';
 $bodyClass = trim(($bodyClass ?? '') . ' has-header');
 
@@ -13,6 +14,8 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $isAuthenticated = !empty($_SESSION['auth_user_id']);
 $userName = $_SESSION['auth_user_name'] ?? 'Perfil';
+$userRole = $_SESSION['auth_user_role'] ?? null;
+$isStaff = $userRole === 'admin';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -36,11 +39,14 @@ $userName = $_SESSION['auth_user_name'] ?? 'Perfil';
 
         <nav class="site-nav">
             <?php if ($isAuthenticated) : ?>
-                <a href="index.php?route=home">Inicio</a>
-                <a href="index.php?route=vehicles">Vehículos</a>
-                <a href="index.php?route=maintenance">Mantenimientos</a>
-                <a href="index.php?route=rentals">Alquileres</a>
-                <a href="index.php?route=audit">Auditoria</a>
+                <?php if ($isStaff) : ?>
+                    <a href="index.php?route=home">Inicio</a>
+                    <a href="index.php?route=vehicles">Vehículos</a>
+                    <a href="index.php?route=maintenance">Mantenimientos</a>
+                    <a href="index.php?route=obligations">Obligaciones</a>
+                    <a href="index.php?route=rentals">Alquileres</a>
+                    <a href="index.php?route=audit">Auditoria</a>
+                <?php endif; ?>
                 <a href="index.php?route=auth/logout">Cerrar sesión</a>
             <?php else : ?>
                 <a href="index.php?route=auth/login">Login</a>

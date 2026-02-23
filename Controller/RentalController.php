@@ -1,6 +1,8 @@
 <?php
 
 require_once dirname(__DIR__) . '/Database/Database.php';
+require_once dirname(__DIR__) . '/Core/Csrf.php';
+require_once dirname(__DIR__) . '/Core/AuthGuard.php';
 require_once dirname(__DIR__) . '/Core/View.php';
 require_once dirname(__DIR__) . '/Model/AuditLogModel.php';
 require_once dirname(__DIR__) . '/Model/RentalModel.php';
@@ -37,14 +39,14 @@ class RentalController
      */
     public function index(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
 
         $filters = [
             'search' => trim((string) ($_GET['search'] ?? '')),
             'status' => trim((string) ($_GET['status'] ?? '')),
             'vehicle_id' => trim((string) ($_GET['vehicle_id'] ?? '')),
-            'date_from' => trim((string) ($_GET['date_from'] ?? '')),
-            'date_to' => trim((string) ($_GET['date_to'] ?? '')),
+            'date_from' => $this->sanitizeDateFilter($_GET['date_from'] ?? ''),
+            'date_to' => $this->sanitizeDateFilter($_GET['date_to'] ?? ''),
         ];
 
         $page = max(1, (int) ($_GET['page'] ?? 1));
@@ -74,15 +76,61 @@ class RentalController
     }
 
     /**
+     * Muestra el historial de alquileres de un cliente.
+     */
+    public function history(): void
+    {
+        AuthGuard::requireRoles(['admin']);
+
+        $identifier = trim((string) ($_GET['client'] ?? ''));
+        if ($identifier === '') {
+            $_SESSION['rental_flash'] = 'Seleccioná un cliente para ver el historial.';
+            $this->redirectToRoute('rentals');
+        }
+
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $perPage = 50;
+        $total = $this->rentalModel->countByClient($identifier);
+        $totalPages = (int) max(1, ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        $history = $this->rentalModel->listByClient($identifier, $perPage, $offset);
+        $summary = $this->rentalModel->clientSummary($identifier);
+
+        View::render('Rentals/History.php', [
+            'history' => $history,
+            'summary' => $summary,
+            'clientIdentifier' => $identifier,
+            'pagination' => [
+                'page' => $page,
+                'perPage' => $perPage,
+                'total' => $total,
+                'totalPages' => $totalPages,
+            ],
+            'pageTitle' => 'Historial de alquileres | AutoFlow',
+            'bodyClass' => 'dashboard-page rentals-page rentals-history-page',
+        ]);
+    }
+
+    /**
      * Prepara el formulario de alta reutilizando datos por defecto o previos.
      */
     public function create(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
 
         [$formData, $formErrors] = $this->pullFormState();
         if (empty($formData)) {
             $formData = $this->rentalModel->defaultFormData();
+        }
+
+        $prefillVehicleId = (int) ($_GET['vehicle_id'] ?? 0);
+        if ($prefillVehicleId > 0) {
+            $vehicle = $this->vehicleModel->find($prefillVehicleId);
+            if ($vehicle) {
+                $formData['vehicle_id'] = $prefillVehicleId;
+            }
         }
 
         View::render('Rentals/Form.php', [
@@ -101,7 +149,7 @@ class RentalController
      */
     public function store(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
         $this->assertPostRequest();
 
         $formData = $this->rentalModel->applyDerivedValues(
@@ -116,6 +164,7 @@ class RentalController
 
         $rentalId = $this->rentalModel->create($formData);
         $this->applyOdometerUpdate($rentalId, $formData);
+        $this->vehicleModel->updateStatusFromRental((int) $formData['vehicle_id'], (string) $formData['status']);
         $this->logAudit('create', 'rental', $rentalId, null, $formData, 'Alta de alquiler');
 
         $_SESSION['rental_flash'] = 'Alquiler registrado correctamente.';
@@ -127,7 +176,7 @@ class RentalController
      */
     public function edit(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
 
         $rentalId = (int) ($_GET['id'] ?? 0);
         $rental = $this->rentalModel->find($rentalId);
@@ -158,7 +207,7 @@ class RentalController
      */
     public function update(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
         $this->assertPostRequest();
 
         $rentalId = (int) ($_POST['id'] ?? 0);
@@ -181,6 +230,7 @@ class RentalController
 
         $this->rentalModel->update($rentalId, $formData);
         $this->applyOdometerUpdate($rentalId, $formData);
+        $this->vehicleModel->updateStatusFromRental((int) $formData['vehicle_id'], (string) $formData['status']);
         $this->logAudit('update', 'rental', $rentalId, $rental, $formData, 'Edición de alquiler');
 
         $_SESSION['rental_flash'] = 'Alquiler actualizado.';
@@ -192,7 +242,7 @@ class RentalController
      */
     public function delete(): void
     {
-        $this->ensureAuthenticated();
+        AuthGuard::requireRoles(['admin']);
         $this->assertPostRequest();
 
         $rentalId = (int) ($_POST['id'] ?? 0);
@@ -202,6 +252,9 @@ class RentalController
 
         $rental = $this->rentalModel->find($rentalId);
         $this->rentalModel->delete($rentalId);
+        if (!empty($rental['vehicle_id'])) {
+            $this->vehicleModel->updateStatusFromRental((int) $rental['vehicle_id'], 'cancelled');
+        }
         $this->logAudit('delete', 'rental', $rentalId, $rental, null, 'Baja de alquiler');
 
         $_SESSION['rental_flash'] = 'Alquiler eliminado.';
@@ -230,19 +283,17 @@ class RentalController
     /**
      * Bloquea el acceso a usuarios sin sesión activa.
      */
-    private function ensureAuthenticated(): void
-    {
-        if (empty($_SESSION['auth_user_id'])) {
-            $this->redirectToRoute('auth/login');
-        }
-    }
-
     /**
      * Se asegura de que la ruta haya sido invocada mediante POST.
      */
     private function assertPostRequest(): void
     {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            $this->redirectToRoute('rentals');
+        }
+
+        if (!Csrf::validate($_POST['_csrf'] ?? null)) {
+            $_SESSION['rental_flash'] = 'La sesión expiró. Volvé a intentarlo.';
             $this->redirectToRoute('rentals');
         }
     }
@@ -301,5 +352,16 @@ class RentalController
         } catch (Throwable $exception) {
             // No-op: no bloquear flujos por auditoria.
         }
+    }
+
+    private function sanitizeDateFilter($value): string
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return '';
+        }
+
+        $date = DateTime::createFromFormat('Y-m-d', $value);
+        return $date instanceof DateTime && $date->format('Y-m-d') === $value ? $value : '';
     }
 }

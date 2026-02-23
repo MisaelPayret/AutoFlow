@@ -3,6 +3,7 @@ $isEdit = $isEdit ?? false;
 $formData = $formData ?? [];
 $formErrors = $formErrors ?? [];
 $vehicles = $vehicles ?? [];
+$statusOptions = $statusOptions ?? [];
 $pageTitle = $pageTitle ?? (($isEdit ? 'Editar' : 'Nuevo') . ' mantenimiento | AutoFlow');
 $bodyClass = $bodyClass ?? 'dashboard-page maintenance-page';
 $actionRoute = $isEdit ? 'maintenance/update' : 'maintenance/store';
@@ -31,7 +32,7 @@ include_once __DIR__ . '/../Include/Header.php';
 
     <?php if (!empty($formErrors)) : ?>
         <div class="alert alert-error">
-            <strong>Revisá los campos:</strong>
+            <strong>Revisa los Campos:</strong>
             <ul>
                 <?php foreach ($formErrors as $error) : ?>
                     <li><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></li>
@@ -41,6 +42,7 @@ include_once __DIR__ . '/../Include/Header.php';
     <?php endif; ?>
 
     <form method="POST" action="index.php?route=<?= $actionRoute; ?>" class="form-grid">
+        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token(), ENT_QUOTES, 'UTF-8'); ?>">
         <?php if ($isEdit) : ?>
             <input type="hidden" name="id" value="<?= (int) ($formData['id'] ?? 0); ?>">
         <?php endif; ?>
@@ -65,6 +67,7 @@ include_once __DIR__ . '/../Include/Header.php';
         <div class="form-field <?= $hasFieldError('service_type') ? 'has-error' : ''; ?>">
             <label for="service_type">Tipo de servicio *</label>
             <input type="text" id="service_type" name="service_type" required value="<?= htmlspecialchars($formData['service_type'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+            <small class="form-hint">Ej: Cambio de aceite, frenos, revisión.</small>
             <?php if ($hasFieldError('service_type')) : ?>
                 <small class="form-error">&middot; <?= htmlspecialchars($getFieldError('service_type'), ENT_QUOTES, 'UTF-8'); ?></small>
             <?php endif; ?>
@@ -73,6 +76,7 @@ include_once __DIR__ . '/../Include/Header.php';
         <div class="form-field <?= $hasFieldError('service_date') ? 'has-error' : ''; ?>">
             <label for="service_date">Fecha del servicio *</label>
             <input type="date" id="service_date" name="service_date" required value="<?= htmlspecialchars($formData['service_date'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+            <small class="form-hint">Usá la fecha real del taller.</small>
             <?php if ($hasFieldError('service_date')) : ?>
                 <small class="form-error">&middot; <?= htmlspecialchars($getFieldError('service_date'), ENT_QUOTES, 'UTF-8'); ?></small>
             <?php endif; ?>
@@ -94,9 +98,22 @@ include_once __DIR__ . '/../Include/Header.php';
             <?php endif; ?>
         </div>
 
+        <div class="form-field <?= $hasFieldError('status') ? 'has-error' : ''; ?>">
+            <label for="status">Estado</label>
+            <select id="status" name="status">
+                <?php foreach ($statusOptions as $option) : ?>
+                    <option value="<?= $option; ?>" <?= ($formData['status'] ?? 'pending') === $option ? 'selected' : ''; ?>><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $option)), ENT_QUOTES, 'UTF-8'); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <?php if ($hasFieldError('status')) : ?>
+                <small class="form-error">&middot; <?= htmlspecialchars($getFieldError('status'), ENT_QUOTES, 'UTF-8'); ?></small>
+            <?php endif; ?>
+        </div>
+
         <div class="form-field <?= $hasFieldError('next_service_date') ? 'has-error' : ''; ?>">
             <label for="next_service_date">Próximo servicio</label>
             <input type="date" id="next_service_date" name="next_service_date" value="<?= htmlspecialchars($formData['next_service_date'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+            <small class="form-hint">Dejalo vacío si no aplica.</small>
             <?php if ($hasFieldError('next_service_date')) : ?>
                 <small class="form-error">&middot; <?= htmlspecialchars($getFieldError('next_service_date'), ENT_QUOTES, 'UTF-8'); ?></small>
             <?php endif; ?>

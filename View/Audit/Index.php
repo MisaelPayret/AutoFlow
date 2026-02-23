@@ -1,5 +1,5 @@
 <?php
-$pageTitle = $pageTitle ?? 'Auditoria | AutoFlow';
+$pageTitle = $pageTitle ?? 'Auditoría | AutoFlow';
 $bodyClass = $bodyClass ?? 'dashboard-page audit-page';
 $logs = $logs ?? [];
 $filters = $filters ?? [];
@@ -14,6 +14,7 @@ $entityId = $filters['entity_id'] ?? '';
 $userId = $filters['user_id'] ?? '';
 $dateFrom = $filters['date_from'] ?? '';
 $dateTo = $filters['date_to'] ?? '';
+$hasFilters = $search !== '' || $action !== '' || $entityType !== '' || $entityId !== '' || $userId !== '' || $dateFrom !== '' || $dateTo !== '';
 
 include_once __DIR__ . '/../Include/Header.php';
 ?>
@@ -21,8 +22,8 @@ include_once __DIR__ . '/../Include/Header.php';
 <main class="audit">
     <section class="toolbar">
         <div>
-            <h1>Auditoria</h1>
-            <p>Revision de cambios realizados en el sistema.</p>
+            <h1>Auditoría</h1>
+            <p>Revisión de cambios realizados en el sistema.</p>
         </div>
     </section>
 
@@ -30,10 +31,10 @@ include_once __DIR__ . '/../Include/Header.php';
         <input type="hidden" name="route" value="audit">
         <div class="filter-group">
             <label for="search">Buscar</label>
-            <input type="text" id="search" name="search" placeholder="Accion, entidad, usuario..." value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="text" id="search" name="search" placeholder="Acción, entidad, usuario..." value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8'); ?>">
         </div>
         <div class="filter-group">
-            <label for="action">Accion</label>
+            <label for="action">Acción</label>
             <select id="action" name="action">
                 <option value="">Todas</option>
                 <?php foreach ($actions as $option) : ?>
@@ -82,10 +83,13 @@ include_once __DIR__ . '/../Include/Header.php';
             <input type="date" id="date_to" name="date_to" value="<?= htmlspecialchars($dateTo, ENT_QUOTES, 'UTF-8'); ?>">
         </div>
         <button type="submit" class="btn ghost">Filtrar</button>
+        <?php if ($hasFilters) : ?>
+            <a class="btn ghost" href="index.php?route=audit">Limpiar</a>
+        <?php endif; ?>
     </form>
 
     <?php if (empty($logs)) : ?>
-        <p class="empty-state">No hay registros de auditoria para los filtros actuales.</p>
+        <p class="empty-state">No hay registros de auditoría para los filtros actuales.</p>
     <?php else : ?>
         <div class="table-wrapper">
             <table class="data-table">
@@ -93,7 +97,7 @@ include_once __DIR__ . '/../Include/Header.php';
                     <tr>
                         <th>Fecha</th>
                         <th>Usuario</th>
-                        <th>Accion</th>
+                        <th>Acción</th>
                         <th>Entidad</th>
                         <th>Resumen</th>
                     </tr>
@@ -107,7 +111,7 @@ include_once __DIR__ . '/../Include/Header.php';
                         <tr>
                             <td data-label="Fecha"><?= htmlspecialchars(substr((string) $log['created_at'], 0, 16), ENT_QUOTES, 'UTF-8'); ?></td>
                             <td data-label="Usuario"><?= htmlspecialchars($userLabel, ENT_QUOTES, 'UTF-8'); ?></td>
-                            <td data-label="Accion"><?= htmlspecialchars($log['action'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td data-label="Acción"><?= htmlspecialchars($log['action'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
                             <td data-label="Entidad"><?= htmlspecialchars($entityLabel, ENT_QUOTES, 'UTF-8'); ?></td>
                             <td data-label="Resumen">
                                 <details>
@@ -120,7 +124,7 @@ include_once __DIR__ . '/../Include/Header.php';
                                     <?php endif; ?>
                                     <?php if (!empty($log['after_data'])) : ?>
                                         <div class="audit-detail">
-                                            <strong>Despues</strong>
+                                            <strong>Después</strong>
                                             <pre><?= htmlspecialchars($log['after_data'], ENT_QUOTES, 'UTF-8'); ?></pre>
                                         </div>
                                     <?php endif; ?>
