@@ -2,6 +2,12 @@
 
 // Puerta de entrada del proyecto: carga las rutas y delega a los controladores.
 $basePath = dirname(__DIR__);
+require_once $basePath . '/Database/Database.php';
+require_once $basePath . '/Model/AlertModel.php';
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 $routesFile = $basePath . '/Router/web.php';
 $routes = is_file($routesFile) ? require $routesFile : [];
 
@@ -40,6 +46,18 @@ $className = $controllerName . 'Controller';
 if (!class_exists($className)) {
     echo "❌ Clase '$className' no existe.";
     return;
+}
+
+$lastAlertRun = $_SESSION['alerts_last_run'] ?? 0;
+if (!empty($_SESSION['auth_user_id']) && (time() - (int) $lastAlertRun) > 3600) {
+    try {
+        $database = new Database();
+        $alertModel = new AlertModel($database->getConnection());
+        $alertModel->generateDueAlerts();
+        $_SESSION['alerts_last_run'] = time();
+    } catch (Throwable $exception) {
+        // No-op: evitar que fallas de alertas bloqueen la navegación.
+    }
 }
 
 $controller = new $className();

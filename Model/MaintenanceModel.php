@@ -25,6 +25,88 @@ class MaintenanceModel extends BaseModel
     }
 
     /**
+     * Busca mantenimientos con filtros avanzados.
+     */
+    public function search(array $filters = [], int $limit = 50, int $offset = 0): array
+    {
+        $sql =
+            'SELECT m.*, v.brand, v.model, v.license_plate
+             FROM `maintenance_records` AS m
+             INNER JOIN `vehicles` AS v ON v.id = m.vehicle_id
+             WHERE 1=1';
+        $params = [];
+        $sql .= $this->buildFilterSql($filters, $params);
+        $sql .= ' ORDER BY m.`service_date` DESC, m.`created_at` DESC LIMIT :limit OFFSET :offset';
+
+        $statement = $this->pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $statement->bindValue(':' . $key, $value);
+        }
+        $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $statement->execute();
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * Cuenta mantenimientos para paginacion con filtros.
+     */
+    public function count(array $filters = []): int
+    {
+        $sql =
+            'SELECT COUNT(*)
+             FROM `maintenance_records` AS m
+             INNER JOIN `vehicles` AS v ON v.id = m.vehicle_id
+             WHERE 1=1';
+        $params = [];
+        $sql .= $this->buildFilterSql($filters, $params);
+
+        $statement = $this->pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $statement->bindValue(':' . $key, $value);
+        }
+        $statement->execute();
+
+        return (int) $statement->fetchColumn();
+    }
+
+    /**
+     * Construye condiciones WHERE segun filtros.
+     */
+    private function buildFilterSql(array $filters, array &$params): string
+    {
+        $sql = '';
+
+        if (!empty($filters['search'])) {
+            $sql .= ' AND (
+                m.`service_type` LIKE :search
+                OR v.`license_plate` LIKE :search
+                OR v.`brand` LIKE :search
+                OR v.`model` LIKE :search
+            )';
+            $params['search'] = '%' . $filters['search'] . '%';
+        }
+
+        if (!empty($filters['vehicle_id'])) {
+            $sql .= ' AND m.`vehicle_id` = :vehicle_id';
+            $params['vehicle_id'] = (int) $filters['vehicle_id'];
+        }
+
+        if (!empty($filters['date_from'])) {
+            $sql .= ' AND m.`service_date` >= :date_from';
+            $params['date_from'] = $filters['date_from'];
+        }
+
+        if (!empty($filters['date_to'])) {
+            $sql .= ' AND m.`service_date` <= :date_to';
+            $params['date_to'] = $filters['date_to'];
+        }
+
+        return $sql;
+    }
+
+    /**
      * Busca un registro puntual por ID.
      */
     public function find(int $id): ?array

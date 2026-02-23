@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__) . '/Database/Database.php';
 require_once dirname(__DIR__) . '/Core/View.php';
+require_once dirname(__DIR__) . '/Model/AuditLogModel.php';
 require_once dirname(__DIR__) . '/Model/RentalModel.php';
 require_once dirname(__DIR__) . '/Model/VehicleModel.php';
 
@@ -14,6 +15,7 @@ require_once dirname(__DIR__) . '/Model/VehicleModel.php';
 class RentalController
 {
     private Database $database;
+    private AuditLogModel $auditLogs;
     private RentalModel $rentalModel;
     private VehicleModel $vehicleModel;
 
@@ -27,6 +29,7 @@ class RentalController
         $connection = $this->database->getConnection();
         $this->rentalModel = new RentalModel($connection);
         $this->vehicleModel = new VehicleModel($connection);
+        $this->auditLogs = new AuditLogModel($connection);
     }
 
     /**
@@ -36,7 +39,22 @@ class RentalController
     {
         $this->ensureAuthenticated();
 
-        $rentals = $this->rentalModel->listWithVehicles();
+        $filters = [
+            'search' => trim((string) ($_GET['search'] ?? '')),
+            'status' => trim((string) ($_GET['status'] ?? '')),
+            'vehicle_id' => trim((string) ($_GET['vehicle_id'] ?? '')),
+            'date_from' => trim((string) ($_GET['date_from'] ?? '')),
+            'date_to' => trim((string) ($_GET['date_to'] ?? '')),
+        ];
+
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $perPage = 50;
+        $total = $this->rentalModel->count($filters);
+        $totalPages = (int) max(1, ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        $rentals = $this->rentalModel->search($filters, $perPage, $offset);
         $flashMessage = $_SESSION['rental_flash'] ?? null;
         unset($_SESSION['rental_flash']);
 
@@ -44,6 +62,14 @@ class RentalController
             'rentals' => $rentals,
             'flashMessage' => $flashMessage,
             'statusOptions' => $this->rentalModel->getStatusOptions(),
+            'vehicles' => $this->vehicleModel->vehicleOptions(),
+            'filters' => $filters,
+            'pagination' => [
+                'page' => $page,
+                'perPage' => $perPage,
+                'total' => $total,
+                'totalPages' => $totalPages,
+            ],
         ]);
     }
 
@@ -88,7 +114,9 @@ class RentalController
             $this->redirectToRoute('rentals/create');
         }
 
-        $this->rentalModel->create($formData);
+        $rentalId = $this->rentalModel->create($formData);
+        $this->applyOdometerUpdate($rentalId, $formData);
+        $this->logAudit('create', 'rental', $rentalId, null, $formData, 'Alta de alquiler');
 
         $_SESSION['rental_flash'] = 'Alquiler registrado correctamente.';
         $this->redirectToRoute('rentals');
@@ -145,13 +173,15 @@ class RentalController
             $this->rentalModel->applyDerivedValues($this->rentalModel->normalizeInput($_POST))
         );
 
-        $errors = $this->rentalModel->validate($formData);
+        $errors = $this->rentalModel->validate($formData, $rentalId);
         if (!empty($errors)) {
             $this->rememberFormState($formData, $errors);
             $this->redirectToRoute('rentals/edit', ['id' => $rentalId]);
         }
 
         $this->rentalModel->update($rentalId, $formData);
+        $this->applyOdometerUpdate($rentalId, $formData);
+        $this->logAudit('update', 'rental', $rentalId, $rental, $formData, 'Edición de alquiler');
 
         $_SESSION['rental_flash'] = 'Alquiler actualizado.';
         $this->redirectToRoute('rentals');
@@ -170,7 +200,9 @@ class RentalController
             $this->redirectToRoute('rentals');
         }
 
+        $rental = $this->rentalModel->find($rentalId);
         $this->rentalModel->delete($rentalId);
+        $this->logAudit('delete', 'rental', $rentalId, $rental, null, 'Baja de alquiler');
 
         $_SESSION['rental_flash'] = 'Alquiler eliminado.';
         $this->redirectToRoute('rentals');
@@ -227,5 +259,47 @@ class RentalController
 
         header('Location: ' . $query);
         exit;
+    }
+
+    /**
+     * Actualiza el kilometraje del vehiculo al cerrar el alquiler.
+     */
+    private function applyOdometerUpdate(int $rentalId, array $formData): void
+    {
+        if (($formData['status'] ?? '') !== 'completed') {
+            return;
+        }
+
+        $vehicleId = (int) ($formData['vehicle_id'] ?? 0);
+        $endKm = $formData['odometer_end_km'] ?? null;
+
+        if ($vehicleId <= 0 || $endKm === null) {
+            return;
+        }
+
+        $userId = $_SESSION['auth_user_id'] ?? null;
+
+        $this->vehicleModel->updateMileage($vehicleId, (int) $endKm);
+        $this->vehicleModel->logOdometer($vehicleId, $rentalId, (int) $endKm, $userId, 'Cierre de alquiler');
+    }
+
+    /**
+     * Registra eventos de auditoria del modulo.
+     */
+    private function logAudit(string $action, string $entityType, ?int $entityId, ?array $before, ?array $after, ?string $summary): void
+    {
+        try {
+            $this->auditLogs->create([
+                'user_id' => $_SESSION['auth_user_id'] ?? null,
+                'action' => $action,
+                'entity_type' => $entityType,
+                'entity_id' => $entityId,
+                'summary' => $summary,
+                'before_data' => $before ? json_encode($before, JSON_UNESCAPED_UNICODE) : null,
+                'after_data' => $after ? json_encode($after, JSON_UNESCAPED_UNICODE) : null,
+            ]);
+        } catch (Throwable $exception) {
+            // No-op: no bloquear flujos por auditoria.
+        }
     }
 }

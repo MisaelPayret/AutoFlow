@@ -26,6 +26,10 @@ return [
         'controller' => 'Home',
         'action' => 'index',
     ],
+    'audit' => [
+        'controller' => 'Audit',
+        'action' => 'index',
+    ],
     'vehicles' => [
         'controller' => 'Vehicle',
         'action' => 'index',

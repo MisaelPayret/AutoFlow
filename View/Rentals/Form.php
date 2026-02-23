@@ -114,6 +114,23 @@ include_once __DIR__ . '/../Include/Header.php';
             <small class="form-hint">Se calcula automáticamente según fechas y tarifa.</small>
         </div>
 
+        <div class="form-field <?= $hasFieldError('odometer_start_km') ? 'has-error' : ''; ?>">
+            <label for="odometer_start_km">Kilometraje inicial (km)</label>
+            <input type="number" id="odometer_start_km" name="odometer_start_km" min="0" value="<?= htmlspecialchars((string) ($formData['odometer_start_km'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+            <?php if ($hasFieldError('odometer_start_km')) : ?>
+                <small class="form-error">&middot; <?= htmlspecialchars($getFieldError('odometer_start_km'), ENT_QUOTES, 'UTF-8'); ?></small>
+            <?php endif; ?>
+        </div>
+
+        <div class="form-field <?= $hasFieldError('odometer_end_km') ? 'has-error' : ''; ?>">
+            <label for="odometer_end_km">Kilometraje final (km)</label>
+            <input type="number" id="odometer_end_km" name="odometer_end_km" min="0" value="<?= htmlspecialchars((string) ($formData['odometer_end_km'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+            <small class="form-hint">Cargalo al completar el alquiler.</small>
+            <?php if ($hasFieldError('odometer_end_km')) : ?>
+                <small class="form-error">&middot; <?= htmlspecialchars($getFieldError('odometer_end_km'), ENT_QUOTES, 'UTF-8'); ?></small>
+            <?php endif; ?>
+        </div>
+
         <div class="form-field form-field--full">
             <div class="form-helper form-helper--muted" data-rental-summary>
                 Seleccioná fechas y tarifa para estimar duración y total.

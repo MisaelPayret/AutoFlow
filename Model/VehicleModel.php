@@ -40,7 +40,7 @@ class VehicleModel extends BaseModel
     /**
      * Busca vehículos aplicando filtros de texto y estado.
      */
-    public function search(array $filters = []): array
+    public function search(array $filters = [], int $limit = 50, int $offset = 0): array
     {
         $sql = 'SELECT v.*, (
                     SELECT `storage_path`
@@ -51,6 +51,44 @@ class VehicleModel extends BaseModel
                 ) AS `cover_image`
                 FROM `vehicles` v WHERE 1=1';
         $params = [];
+        $sql .= $this->buildFilterSql($filters, $params);
+        $sql .= ' ORDER BY v.`created_at` DESC LIMIT :limit OFFSET :offset';
+
+        $statement = $this->pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $statement->bindValue(':' . $key, $value);
+        }
+        $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $statement->execute();
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * Cuenta vehiculos para paginacion con filtros.
+     */
+    public function count(array $filters = []): int
+    {
+        $sql = 'SELECT COUNT(*) FROM `vehicles` v WHERE 1=1';
+        $params = [];
+        $sql .= $this->buildFilterSql($filters, $params);
+
+        $statement = $this->pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $statement->bindValue(':' . $key, $value);
+        }
+        $statement->execute();
+
+        return (int) $statement->fetchColumn();
+    }
+
+    /**
+     * Construye condiciones WHERE segun filtros.
+     */
+    private function buildFilterSql(array $filters, array &$params): string
+    {
+        $sql = '';
 
         if (!empty($filters['search'])) {
             $sql .= ' AND (
@@ -67,12 +105,7 @@ class VehicleModel extends BaseModel
             $params['status'] = $filters['status'];
         }
 
-        $sql .= ' ORDER BY v.`created_at` DESC';
-
-        $statement = $this->pdo->prepare($sql);
-        $statement->execute($params);
-
-        return $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return $sql;
     }
 
     /**
@@ -290,6 +323,46 @@ class VehicleModel extends BaseModel
         $vehicle = $statement->fetch(PDO::FETCH_ASSOC);
 
         return $vehicle ?: null;
+    }
+
+    /**
+     * Actualiza el kilometraje del vehiculo sin permitir retrocesos.
+     */
+    public function updateMileage(int $vehicleId, int $mileageKm): void
+    {
+        if ($vehicleId <= 0 || $mileageKm < 0) {
+            return;
+        }
+
+        $statement = $this->pdo->prepare(
+            'UPDATE `vehicles` SET `mileage_km` = GREATEST(`mileage_km`, :mileage_km) WHERE `id` = :id'
+        );
+        $statement->execute([
+            'mileage_km' => $mileageKm,
+            'id' => $vehicleId,
+        ]);
+    }
+
+    /**
+     * Guarda un registro de odometro asociado a un alquiler.
+     */
+    public function logOdometer(int $vehicleId, ?int $rentalId, int $mileageKm, $userId = null, ?string $note = null): void
+    {
+        if ($vehicleId <= 0 || $mileageKm < 0) {
+            return;
+        }
+
+        $statement = $this->pdo->prepare(
+            'INSERT INTO `vehicle_odometer_logs` (vehicle_id, rental_id, recorded_by, mileage_km, note)
+             VALUES (:vehicle_id, :rental_id, :recorded_by, :mileage_km, :note)'
+        );
+        $statement->execute([
+            'vehicle_id' => $vehicleId,
+            'rental_id' => $rentalId ?: null,
+            'recorded_by' => $userId ?: null,
+            'mileage_km' => $mileageKm,
+            'note' => $note,
+        ]);
     }
 
     /**

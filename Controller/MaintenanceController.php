@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__) . '/Database/Database.php';
 require_once dirname(__DIR__) . '/Core/View.php';
+require_once dirname(__DIR__) . '/Model/AuditLogModel.php';
 require_once dirname(__DIR__) . '/Model/MaintenanceModel.php';
 require_once dirname(__DIR__) . '/Model/VehicleModel.php';
 
@@ -14,6 +15,7 @@ require_once dirname(__DIR__) . '/Model/VehicleModel.php';
 class MaintenanceController
 {
     private Database $database;
+    private AuditLogModel $auditLogs;
     private MaintenanceModel $maintenanceModel;
     private VehicleModel $vehicleModel;
 
@@ -27,6 +29,7 @@ class MaintenanceController
         $connection = $this->database->getConnection();
         $this->maintenanceModel = new MaintenanceModel($connection);
         $this->vehicleModel = new VehicleModel($connection);
+        $this->auditLogs = new AuditLogModel($connection);
     }
 
     /**
@@ -36,13 +39,35 @@ class MaintenanceController
     {
         $this->ensureAuthenticated();
 
-        $records = $this->maintenanceModel->listWithVehicles();
+        $filters = [
+            'search' => trim((string) ($_GET['search'] ?? '')),
+            'vehicle_id' => trim((string) ($_GET['vehicle_id'] ?? '')),
+            'date_from' => trim((string) ($_GET['date_from'] ?? '')),
+            'date_to' => trim((string) ($_GET['date_to'] ?? '')),
+        ];
+
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $perPage = 50;
+        $total = $this->maintenanceModel->count($filters);
+        $totalPages = (int) max(1, ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        $records = $this->maintenanceModel->search($filters, $perPage, $offset);
         $flashMessage = $_SESSION['maintenance_flash'] ?? null;
         unset($_SESSION['maintenance_flash']);
 
         View::render('Maintenance/Index.php', [
             'records' => $records,
             'flashMessage' => $flashMessage,
+            'vehicles' => $this->vehicleModel->vehicleOptions(),
+            'filters' => $filters,
+            'pagination' => [
+                'page' => $page,
+                'perPage' => $perPage,
+                'total' => $total,
+                'totalPages' => $totalPages,
+            ],
         ]);
     }
 
@@ -84,7 +109,8 @@ class MaintenanceController
             $this->redirectToRoute('maintenance/create');
         }
 
-        $this->maintenanceModel->create($formData);
+        $recordId = $this->maintenanceModel->create($formData);
+        $this->logAudit('create', 'maintenance', $recordId, null, $formData, 'Alta de mantenimiento');
 
         $_SESSION['maintenance_flash'] = 'Mantenimiento registrado correctamente.';
         $this->redirectToRoute('maintenance');
@@ -143,6 +169,7 @@ class MaintenanceController
         }
 
         $this->maintenanceModel->update($recordId, $formData);
+        $this->logAudit('update', 'maintenance', $recordId, $record, $formData, 'Edición de mantenimiento');
 
         $_SESSION['maintenance_flash'] = 'Mantenimiento actualizado.';
         $this->redirectToRoute('maintenance');
@@ -161,7 +188,9 @@ class MaintenanceController
             $this->redirectToRoute('maintenance');
         }
 
+        $record = $this->maintenanceModel->find($recordId);
         $this->maintenanceModel->delete($recordId);
+        $this->logAudit('delete', 'maintenance', $recordId, $record, null, 'Baja de mantenimiento');
 
         $_SESSION['maintenance_flash'] = 'Registro eliminado.';
         $this->redirectToRoute('maintenance');
@@ -218,5 +247,25 @@ class MaintenanceController
 
         header('Location: ' . $query);
         exit;
+    }
+
+    /**
+     * Registra eventos de auditoria del modulo.
+     */
+    private function logAudit(string $action, string $entityType, ?int $entityId, ?array $before, ?array $after, ?string $summary): void
+    {
+        try {
+            $this->auditLogs->create([
+                'user_id' => $_SESSION['auth_user_id'] ?? null,
+                'action' => $action,
+                'entity_type' => $entityType,
+                'entity_id' => $entityId,
+                'summary' => $summary,
+                'before_data' => $before ? json_encode($before, JSON_UNESCAPED_UNICODE) : null,
+                'after_data' => $after ? json_encode($after, JSON_UNESCAPED_UNICODE) : null,
+            ]);
+        } catch (Throwable $exception) {
+            // No-op: no bloquear flujos por auditoria.
+        }
     }
 }

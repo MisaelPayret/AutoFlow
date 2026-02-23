@@ -17,66 +17,83 @@ RESUMEN DE LO QUE YA EXISTE
 - Carpeta de imágenes y uploads para vehículos.
 
 
-PENDIENTES
+PENDIENTES (POR MODULOS)
 
-A. Revisión técnica y saneamiento
-1. Revisar rutas definidas y coherencia entre Router y Controladores.
-2. Validar que todos los métodos referidos en rutas existan en controladores.
-3. Verificar que cada vista tenga su controlador y modelo asociado.
-4. Revisar Core/View.php (carga de vistas, layouts, errores 404/500).
-5. Definir convenciones de naming y estructura de carpetas.
+1) Base de datos e infraestructura
+1. Definir esquema completo (tablas, claves, índices).✅
+2. Crear migraciones/SQL inicial.✅
+3. Ajustar Database.php para conexión segura y configurable.✅
+4. Asegurar uso consistente de prepared statements.✅
+5. Agregar reglas de disponibilidad (no solapamiento de alquileres).✅
+6. Integrar kilometraje inicio/fin por alquiler y actualizacion del vehiculo.✅
+7. Preparar alertas por mantenimiento y vencimientos (patente/seguro).✅
+8. Conectar generacion automatica de alertas (cron/hook en rutas).✅
+9. Crear estructura de planes de mantenimiento por km/fecha.✅
+10. Estructurar obligaciones del vehiculo (patentes, seguros, impuestos).✅
+11. Definir consultas rapidas para filtros y busquedas avanzadas.✅
+12. Registrar auditoria (audit_logs) de altas, ediciones y eliminaciones.✅
 
-B. Base de datos
-1. Definir esquema completo (tablas, claves, índices).
-2. Crear migraciones/SQL inicial.
-3. Ajustar Database.php para conexión segura y configurable.
-4. Asegurar uso consistente de prepared statements.
-
-C. Autenticación y usuarios
-1. Registro con validaciones (email, password fuerte, duplicados).
-2. Login con sesiones seguras.
+2) Autenticacion y usuarios
+1. Registro con validaciones (email, password fuerte, duplicados).✅
+2. Login con sesiones seguras.✅
 3. Logout.
 4. Roles/permisos (admin/cliente/operador).
 5. Protección de rutas y vistas.
+6. Vista de auditoria (audit_logs) con filtros y detalle.✅
 
-D. Módulo de Vehículos
+3) Vehiculos
 1. CRUD completo (crear, listar, editar, eliminar).
 2. Subida/gestión de imágenes (validar tipo/tamaño, borrar al eliminar).
 3. Filtros y búsqueda (marca, modelo, año, disponibilidad).
 4. Detalle público de vehículo (share).
 
-E. Módulo de Rentals (alquileres)
+4) Rentals (alquileres)
 1. Crear alquiler con validación de fechas y disponibilidad.
 2. Cálculo de precio (días, tarifas, extras).
 3. Flujo de estados (pendiente, activo, finalizado, cancelado).
 4. Historial de alquileres por usuario.
+5. Capturar kilometraje inicial/final en cierre de alquiler.
+6. Actualizar kilometraje del vehículo al cerrar alquiler.
 
-F. Módulo de Maintenance (mantenimiento)
+5) Maintenance (mantenimiento)
 1. Registro de mantenimiento por vehículo.
 2. Planificación/estado (pendiente/en proceso/completado).
 3. Historial y costos.
+4. Alertas por kilometraje y vencimientos de servicio.
+5. Planes de mantenimiento por tipo de vehiculo.
 
-G. Validaciones y seguridad
+6) Recordatorios y obligaciones
+1. Gestion de vencimientos de patente/seguro.
+2. Alertas automaticas por vencimiento y atrasos.
+
+7) Validaciones y seguridad
 1. Validaciones server-side en todos los formularios.
 2. Sanitización de inputs.
 3. Manejo de errores y mensajes al usuario.
 4. CSRF tokens en formularios críticos.
 
-H. UI/UX
+8) UI/UX
 1. Unificar layout (Header/Footer) en todas las vistas.
 2. Mejorar formularios (errores visibles, campos requeridos).
 3. Página de error 404 amigable.
 4. Responsive y accesibilidad básica.
 
-I. Testing y QA
+9) Testing y QA
 1. Pruebas manuales de rutas críticas.
 2. Casos borde (fechas inválidas, inventario agotado, uploads).
 3. Validación de permisos.
 
-J. Documentación
+10) Documentación
 1. README con setup (XAMPP, DB, rutas).
 2. Manual rápido de uso (admin y cliente).
 3. Guía de despliegue.
+
+11) Revisión tecnica y saneamiento
+1. Revisar rutas definidas y coherencia entre Router y Controladores.✅
+2. Validar que todos los métodos referidos en rutas existan en controladores.✅
+3. Verificar que cada vista tenga su controlador y modelo asociado.✅
+4. Revisar Core/View.php (carga de vistas, layouts, errores 404/500).✅
+5. Definir convenciones de naming y estructura de carpetas.✅
 
 
 NOTAS DE ORGANIZACIÓN

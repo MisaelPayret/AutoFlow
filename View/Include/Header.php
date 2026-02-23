@@ -40,6 +40,7 @@ $userName = $_SESSION['auth_user_name'] ?? 'Perfil';
                 <a href="index.php?route=vehicles">Vehículos</a>
                 <a href="index.php?route=maintenance">Mantenimientos</a>
                 <a href="index.php?route=rentals">Alquileres</a>
+                <a href="index.php?route=audit">Auditoria</a>
                 <a href="index.php?route=auth/logout">Cerrar sesión</a>
             <?php else : ?>
                 <a href="index.php?route=auth/login">Login</a>

@@ -15,6 +15,8 @@ class AuthController
 {
     private Database $database;
     private UserModel $users;
+    private const LOGIN_MAX_ATTEMPTS = 5;
+    private const LOGIN_COOLDOWN_SECONDS = 600;
 
     public function __construct()
     {
@@ -94,6 +96,12 @@ class AuthController
             return;
         }
 
+        if ($this->isLoginBlocked()) {
+            $_SESSION['auth_error'] = $this->getLoginBlockedMessage();
+            $this->redirectToLogin();
+            return;
+        }
+
         $identifier = trim((string)($_POST['identifier'] ?? ''));
         $password = (string)($_POST['password'] ?? '');
 
@@ -109,13 +117,19 @@ class AuthController
         if (!$user) {
             $_SESSION['auth_error'] = 'Credenciales inválidas.';
             $_SESSION['auth_identifier'] = $identifier;
+            $this->registerFailedLogin();
             $this->redirectToLogin();
             return;
         }
 
+        $this->resetLoginAttempts();
+        session_regenerate_id(true);
+
         $_SESSION['auth_user_id'] = $user['id'];
         $_SESSION['auth_user_name'] = $user['name'];
         $_SESSION['auth_user_role'] = $user['role'];
+
+        $this->users->updateLastLogin((int) $user['id']);
 
         unset($_SESSION['auth_identifier']);
 
@@ -195,5 +209,57 @@ class AuthController
         $location = 'index.php?route=' . rawurlencode($route);
         header('Location: ' . $location);
         exit;
+    }
+
+    /**
+     * Registra un intento fallido para limitar ataques de fuerza bruta.
+     */
+    private function registerFailedLogin(): void
+    {
+        $attempts = (int) ($_SESSION['auth_login_attempts'] ?? 0);
+        $_SESSION['auth_login_attempts'] = $attempts + 1;
+        $_SESSION['auth_login_last_attempt'] = time();
+    }
+
+    /**
+     * Reinicia el contador de intentos tras un login valido.
+     */
+    private function resetLoginAttempts(): void
+    {
+        unset($_SESSION['auth_login_attempts'], $_SESSION['auth_login_last_attempt']);
+    }
+
+    /**
+     * Determina si el login esta bloqueado por demasiados intentos.
+     */
+    private function isLoginBlocked(): bool
+    {
+        $attempts = (int) ($_SESSION['auth_login_attempts'] ?? 0);
+        $lastAttempt = (int) ($_SESSION['auth_login_last_attempt'] ?? 0);
+
+        if ($attempts < self::LOGIN_MAX_ATTEMPTS) {
+            return false;
+        }
+
+        if ((time() - $lastAttempt) > self::LOGIN_COOLDOWN_SECONDS) {
+            $this->resetLoginAttempts();
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Mensaje de bloqueo con minutos restantes aproximados.
+     */
+    private function getLoginBlockedMessage(): string
+    {
+        $lastAttempt = (int) ($_SESSION['auth_login_last_attempt'] ?? 0);
+        $remaining = max(0, self::LOGIN_COOLDOWN_SECONDS - (time() - $lastAttempt));
+        $minutes = (int) ceil($remaining / 60);
+
+        return $minutes <= 1
+            ? 'Demasiados intentos. Esperá 1 minuto para reintentar.'
+            : 'Demasiados intentos. Esperá ' . $minutes . ' minutos para reintentar.';
     }
 }

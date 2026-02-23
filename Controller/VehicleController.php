@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__) . '/Database/Database.php';
 require_once dirname(__DIR__) . '/Core/View.php';
+require_once dirname(__DIR__) . '/Model/AuditLogModel.php';
 require_once dirname(__DIR__) . '/Model/VehicleModel.php';
 
 /**
@@ -14,6 +15,7 @@ require_once dirname(__DIR__) . '/Model/VehicleModel.php';
 class VehicleController
 {
     private Database $database;
+    private AuditLogModel $auditLogs;
     private VehicleModel $vehicleModel;
     private array $statusOptions = [];
     private array $transmissionOptions = [];
@@ -26,7 +28,9 @@ class VehicleController
         }
 
         $this->database = new Database();
-        $this->vehicleModel = new VehicleModel($this->database->getConnection());
+        $connection = $this->database->getConnection();
+        $this->vehicleModel = new VehicleModel($connection);
+        $this->auditLogs = new AuditLogModel($connection);
         $this->statusOptions = $this->vehicleModel->getStatusOptions();
         $this->transmissionOptions = $this->vehicleModel->getTransmissionOptions();
         $this->fuelOptions = $this->vehicleModel->getFuelOptions();
@@ -39,13 +43,22 @@ class VehicleController
     {
         $this->ensureAuthenticated();
 
-        $search = trim((string)($_GET['search'] ?? ''));
-        $status = trim((string)($_GET['status'] ?? ''));
-        $status = in_array($status, $this->statusOptions, true) ? $status : '';
-        $vehicles = $this->vehicleModel->search([
-            'search' => $search,
-            'status' => $status,
-        ]);
+        $filters = [
+            'search' => trim((string) ($_GET['search'] ?? '')),
+            'status' => trim((string) ($_GET['status'] ?? '')),
+        ];
+        if (!in_array($filters['status'], $this->statusOptions, true)) {
+            $filters['status'] = '';
+        }
+
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $perPage = 50;
+        $total = $this->vehicleModel->count($filters);
+        $totalPages = (int) max(1, ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        $vehicles = $this->vehicleModel->search($filters, $perPage, $offset);
         $statusCounts = $this->vehicleModel->countByStatus();
 
         $flashMessage = $_SESSION['vehicle_flash'] ?? null;
@@ -58,8 +71,15 @@ class VehicleController
             'vehicles' => $vehicles,
             'statusCounts' => $statusCounts,
             'statusOptions' => $this->statusOptions,
-            'search' => $search,
-            'status' => $status,
+            'search' => $filters['search'],
+            'status' => $filters['status'],
+            'filters' => $filters,
+            'pagination' => [
+                'page' => $page,
+                'perPage' => $perPage,
+                'total' => $total,
+                'totalPages' => $totalPages,
+            ],
             'flashMessage' => $flashMessage,
             'uploadWarnings' => $uploadWarnings,
             'uploadSummary' => $uploadSummary,
@@ -118,6 +138,8 @@ class VehicleController
 
         $uploadFeedback = $this->processVehicleImagesUpload($vehicleId);
         $this->flashUploadFeedback($uploadFeedback, ['list', 'form']);
+
+        $this->logAudit('create', 'vehicle', $vehicleId, null, $formData, 'Alta de vehículo');
 
         $_SESSION['vehicle_flash'] = 'Vehículo creado correctamente.';
         $this->redirectToRoute('vehicles/edit', ['id' => $vehicleId]);
@@ -197,6 +219,8 @@ class VehicleController
             return;
         }
 
+        $this->logAudit('update', 'vehicle', $vehicleId, $vehicle, $formData, 'Edición de vehículo');
+
         $this->applyGalleryEdits($vehicleId);
 
         $uploadFeedback = $this->processVehicleImagesUpload($vehicleId);
@@ -220,11 +244,14 @@ class VehicleController
         }
 
         $images = $this->vehicleModel->getImages($vehicleId);
+        $vehicle = $this->vehicleModel->find($vehicleId);
         $this->vehicleModel->delete($vehicleId);
 
         foreach ($images as $image) {
             $this->removeImageFromDisk($image['storage_path'] ?? null);
         }
+
+        $this->logAudit('delete', 'vehicle', $vehicleId, $vehicle, null, 'Baja de vehículo');
 
         $_SESSION['vehicle_flash'] = 'Vehículo eliminado.';
         $this->redirectToRoute('vehicles');
@@ -829,5 +856,25 @@ class VehicleController
         $location = 'index.php?' . http_build_query($query);
         header('Location: ' . $location);
         exit;
+    }
+
+    /**
+     * Registra eventos de auditoria del modulo.
+     */
+    private function logAudit(string $action, string $entityType, ?int $entityId, ?array $before, ?array $after, ?string $summary): void
+    {
+        try {
+            $this->auditLogs->create([
+                'user_id' => $_SESSION['auth_user_id'] ?? null,
+                'action' => $action,
+                'entity_type' => $entityType,
+                'entity_id' => $entityId,
+                'summary' => $summary,
+                'before_data' => $before ? json_encode($before, JSON_UNESCAPED_UNICODE) : null,
+                'after_data' => $after ? json_encode($after, JSON_UNESCAPED_UNICODE) : null,
+            ]);
+        } catch (Throwable $exception) {
+            // No-op: no bloquear flujos por auditoria.
+        }
     }
 }

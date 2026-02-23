@@ -10,6 +10,8 @@ require_once __DIR__ . '/BaseModel.php';
 class UserModel extends BaseModel
 {
     private const ROLE_OPTIONS = ['admin', 'client'];
+    private const MIN_PASSWORD_LENGTH = 8;
+    private const MIN_NAME_LENGTH = 3;
 
     /**
      * Devuelve los roles permitidos para validar inputs externos.
@@ -39,23 +41,42 @@ class UserModel extends BaseModel
     {
         $errors = [];
 
-        if ($data['name'] === '') {
+        $name = trim((string) $data['name']);
+        $email = trim((string) $data['email']);
+        $password = (string) $data['password'];
+
+        if ($name === '') {
             $errors['name'] = 'El nombre es obligatorio.';
+        } elseif (mb_strlen($name) < self::MIN_NAME_LENGTH) {
+            $errors['name'] = 'El nombre debe tener al menos 3 caracteres.';
         }
 
-        if ($data['email'] === '' || !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $errors['email'] = 'Ingresá un correo válido.';
+        } elseif (mb_strlen($email) > 190) {
+            $errors['email'] = 'El correo es demasiado largo.';
         }
 
-        if (strlen($data['password']) < 8) {
+        if (strlen($password) < self::MIN_PASSWORD_LENGTH) {
             $errors['password'] = 'La contraseña debe tener al menos 8 caracteres.';
+        } elseif (!$this->isStrongPassword($password)) {
+            $errors['password'] = 'La contraseña debe incluir mayúsculas, minúsculas y números.';
         }
 
-        if ($data['password'] !== $data['password_confirmation']) {
+        if ($password !== $data['password_confirmation']) {
             $errors['password_confirmation'] = 'Las contraseñas no coinciden.';
         }
 
         return $errors;
+    }
+
+    /**
+     * Actualiza el ultimo ingreso del usuario.
+     */
+    public function updateLastLogin(int $userId): void
+    {
+        $statement = $this->pdo->prepare('UPDATE `users` SET `last_login_at` = NOW() WHERE `id` = :id');
+        $statement->execute(['id' => $userId]);
     }
 
     /**
@@ -95,9 +116,12 @@ class UserModel extends BaseModel
     public function attemptLogin(string $identifier, string $password): ?array
     {
         $statement = $this->pdo->prepare(
-            'SELECT * FROM `users` WHERE `email` = :identifier OR `name` = :identifier LIMIT 1'
+            'SELECT * FROM `users` WHERE `email` = :email_identifier OR `name` = :name_identifier LIMIT 1'
         );
-        $statement->execute(['identifier' => $identifier]);
+        $statement->execute([
+            'email_identifier' => $identifier,
+            'name_identifier' => $identifier,
+        ]);
         $user = $statement->fetch(PDO::FETCH_ASSOC);
 
         if (!$user || !password_verify($password, (string) $user['password_hash'])) {
@@ -105,5 +129,15 @@ class UserModel extends BaseModel
         }
 
         return $user;
+    }
+
+    /**
+     * Verifica reglas basicas de fuerza de contrasena.
+     */
+    private function isStrongPassword(string $password): bool
+    {
+        return (bool) preg_match('/[A-Z]/', $password)
+            && (bool) preg_match('/[a-z]/', $password)
+            && (bool) preg_match('/\d/', $password);
     }
 }

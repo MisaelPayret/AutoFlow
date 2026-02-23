@@ -5,6 +5,7 @@ $statusCounts = $statusCounts ?? [];
 $statusOptions = $statusOptions ?? [];
 $search = $search ?? '';
 $status = $status ?? '';
+$pagination = $pagination ?? ['page' => 1, 'perPage' => 50, 'total' => 0, 'totalPages' => 1];
 $flashMessage = $flashMessage ?? null;
 $uploadWarnings = $uploadWarnings ?? [];
 $uploadSummary = $uploadSummary ?? [];
@@ -138,6 +139,28 @@ include_once __DIR__ . '/../Include/Header.php';
                 </tbody>
             </table>
         </div>
+        <?php if ($pagination['totalPages'] > 1) : ?>
+            <?php
+            $query = $_GET;
+            $currentPage = (int) $pagination['page'];
+            $totalPages = (int) $pagination['totalPages'];
+            ?>
+            <nav class="pagination">
+                <?php if ($currentPage > 1) :
+                    $query['page'] = $currentPage - 1;
+                ?>
+                    <a class="pagination-link" href="index.php?<?= htmlspecialchars(http_build_query($query), ENT_QUOTES, 'UTF-8'); ?>">Anterior</a>
+                <?php endif; ?>
+
+                <span class="pagination-meta">Página <?= $currentPage; ?> de <?= $totalPages; ?></span>
+
+                <?php if ($currentPage < $totalPages) :
+                    $query['page'] = $currentPage + 1;
+                ?>
+                    <a class="pagination-link" href="index.php?<?= htmlspecialchars(http_build_query($query), ENT_QUOTES, 'UTF-8'); ?>">Siguiente</a>
+                <?php endif; ?>
+            </nav>
+        <?php endif; ?>
     <?php endif; ?>
 </main>
 

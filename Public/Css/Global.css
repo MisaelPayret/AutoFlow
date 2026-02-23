@@ -232,6 +232,40 @@ main {
     border-radius: 0.6rem;
     padding: 0.8rem 1rem;
     font-size: 1rem;
+.audit .filter-form {
+    align-items: flex-end;
+}
+.audit-detail {
+    margin-top: 0.6rem;
+    background: #f8fafc;
+    border-radius: 0.6rem;
+    padding: 0.75rem;
+    border: 1px solid #e2e8f0;
+}
+.audit-detail pre {
+    white-space: pre-wrap;
+    font-size: 0.85rem;
+    color: #1f2937;
+    margin-top: 0.35rem;
+}
+.pagination {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+}
+.pagination-link {
+    border: 1px solid #d1d5db;
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    color: #111;
+    background: #fff;
+}
+.pagination-meta {
+    font-size: 0.9rem;
+    color: #6b7280;
+}
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 

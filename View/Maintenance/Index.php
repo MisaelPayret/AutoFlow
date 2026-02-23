@@ -3,6 +3,13 @@ $pageTitle = 'Mantenimientos | AutoFlow';
 $bodyClass = 'dashboard-page maintenance-page';
 $records = $records ?? [];
 $flashMessage = $flashMessage ?? null;
+$vehicles = $vehicles ?? [];
+$filters = $filters ?? [];
+$pagination = $pagination ?? ['page' => 1, 'perPage' => 50, 'total' => 0, 'totalPages' => 1];
+$search = $filters['search'] ?? '';
+$vehicleId = $filters['vehicle_id'] ?? '';
+$dateFrom = $filters['date_from'] ?? '';
+$dateTo = $filters['date_to'] ?? '';
 
 include_once __DIR__ . '/../Include/Header.php';
 ?>
@@ -23,6 +30,36 @@ include_once __DIR__ . '/../Include/Header.php';
             <?= htmlspecialchars($flashMessage, ENT_QUOTES, 'UTF-8'); ?>
         </div>
     <?php endif; ?>
+
+    <form method="GET" action="index.php" class="filter-form">
+        <input type="hidden" name="route" value="maintenance">
+        <div class="filter-group">
+            <label for="search">Buscar</label>
+            <input type="text" id="search" name="search" placeholder="Servicio, patente, marca..." value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8'); ?>">
+        </div>
+        <div class="filter-group">
+            <label for="vehicle_id">Vehículo</label>
+            <select id="vehicle_id" name="vehicle_id">
+                <option value="">Todos</option>
+                <?php foreach ($vehicles as $vehicle) :
+                    $label = $vehicle['brand'] . ' ' . $vehicle['model'] . ' · ' . $vehicle['license_plate'];
+                ?>
+                    <option value="<?= (int) $vehicle['id']; ?>" <?= (string) $vehicleId === (string) $vehicle['id'] ? 'selected' : ''; ?>>
+                        <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="date_from">Desde</label>
+            <input type="date" id="date_from" name="date_from" value="<?= htmlspecialchars($dateFrom, ENT_QUOTES, 'UTF-8'); ?>">
+        </div>
+        <div class="filter-group">
+            <label for="date_to">Hasta</label>
+            <input type="date" id="date_to" name="date_to" value="<?= htmlspecialchars($dateTo, ENT_QUOTES, 'UTF-8'); ?>">
+        </div>
+        <button type="submit" class="btn ghost">Filtrar</button>
+    </form>
 
     <?php if (empty($records)) : ?>
         <p class="empty-state">Todavía no registraste mantenimientos. Usá el botón "Registrar servicio" para empezar.</p>
@@ -66,6 +103,28 @@ include_once __DIR__ . '/../Include/Header.php';
                 </tbody>
             </table>
         </div>
+        <?php if ($pagination['totalPages'] > 1) : ?>
+            <?php
+            $query = $_GET;
+            $currentPage = (int) $pagination['page'];
+            $totalPages = (int) $pagination['totalPages'];
+            ?>
+            <nav class="pagination">
+                <?php if ($currentPage > 1) :
+                    $query['page'] = $currentPage - 1;
+                ?>
+                    <a class="pagination-link" href="index.php?<?= htmlspecialchars(http_build_query($query), ENT_QUOTES, 'UTF-8'); ?>">Anterior</a>
+                <?php endif; ?>
+
+                <span class="pagination-meta">Página <?= $currentPage; ?> de <?= $totalPages; ?></span>
+
+                <?php if ($currentPage < $totalPages) :
+                    $query['page'] = $currentPage + 1;
+                ?>
+                    <a class="pagination-link" href="index.php?<?= htmlspecialchars(http_build_query($query), ENT_QUOTES, 'UTF-8'); ?>">Siguiente</a>
+                <?php endif; ?>
+            </nav>
+        <?php endif; ?>
     <?php endif; ?>
 </main>
 
